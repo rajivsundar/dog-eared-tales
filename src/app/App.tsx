@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect } from 'react'
 import { Link, Route, Routes, useLocation } from 'react-router'
+import { UpdateBanner } from '../pwa/UpdateBanner'
 import { settingsStore } from '../stores'
 import { FirstRunGate } from '../features/onboarding/FirstRunGate'
 import { SettingsScreen } from '../features/settings/SettingsScreen'
@@ -43,25 +44,28 @@ function useSavedTheme(): void {
 export default function App() {
   useSavedTheme()
   return (
-    <Suspense fallback={<p className="p-6 text-center">Loading…</p>}>
-      <Routes>
-        <Route element={<WithBottomNav />}>
-          <Route
-            path="/"
-            element={
-              <FirstRunGate>
-                <HomePage />
-              </FirstRunGate>
-            }
-          />
-          <Route path="/library" element={<LibraryScreen />} />
-          <Route path="/settings" element={<SettingsScreen />} />
-          <Route path="/all" element={<AllStoriesPage />} />
-          <Route path="*" element={<NotFound />} />
-        </Route>
-        <Route path="/welcome" element={<OnboardingScreen />} />
-        <Route path="/read/:id" element={<ReaderScreen />} />
-      </Routes>
-    </Suspense>
+    <>
+      <UpdateBanner />
+      <Suspense fallback={<p className="p-6 text-center">Loading…</p>}>
+        <Routes>
+          <Route element={<WithBottomNav />}>
+            <Route
+              path="/"
+              element={
+                <FirstRunGate>
+                  <HomePage />
+                </FirstRunGate>
+              }
+            />
+            <Route path="/library" element={<LibraryScreen />} />
+            <Route path="/settings" element={<SettingsScreen />} />
+            <Route path="/all" element={<AllStoriesPage />} />
+            <Route path="*" element={<NotFound />} />
+          </Route>
+          <Route path="/welcome" element={<OnboardingScreen />} />
+          <Route path="/read/:id" element={<ReaderScreen />} />
+        </Routes>
+      </Suspense>
+    </>
   )
 }
