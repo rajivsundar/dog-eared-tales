@@ -1,0 +1,371 @@
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter, Route, Routes } from 'react-router'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type {
+  LocationInfo,
+  OpenOptions,
+  ReaderStyle,
+} from '../../engine/reader'
+import ReaderScreen from './ReaderScreen'
+
+// ---------------------------------------------------------------- stand-ins for the engine, stores and catalog
+const h = vi.hoisted(() => {
+  const failOpen = { value: false }
+  class FakeEngine {
+    open = vi.fn<(url: string, options?: OpenOptions) => Promise<void>>(
+      async () => {
+        if (failOpen.value) throw new Error('the book file is damaged')
+      },
+    )
+    next = vi.fn(async () => {})
+    prev = vi.fn(async () => {})
+    goTo = vi.fn(async () => {})
+    setStyle = vi.fn<(style: ReaderStyle) => void>()
+    close = vi.fn()
+    locationCallbacks: Array<(l: LocationInfo) => void> = []
+    endCallbacks: Array<() => void> = []
+    onLocation(cb: (l: LocationInfo) => void) {
+      this.locationCallbacks.push(cb)
+      return () => {}
+    }
+    onRangeEnd(cb: () => void) {
+      this.endCallbacks.push(cb)
+      return () => {}
+    }
+  }
+  return {
+    failOpen,
+    FakeEngine,
+    engines: [] as InstanceType<typeof FakeEngine>[],
+    progressStore: { get: vi.fn(), set: vi.fn(async (p: unknown) => p) },
+    eventLog: { append: vi.fn(async (e: unknown) => e) },
+    settingsStore: {
+      get: vi.fn(),
+      update: vi.fn(async (c: unknown) => c),
+    },
+  }
+})
+
+vi.mock('../../engine/reader', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../engine/reader')>()
+  return {
+    ...actual,
+    createReaderEngine: () => {
+      const engine = new h.FakeEngine()
+      h.engines.push(engine)
+      return engine
+    },
+  }
+})
+vi.mock('../../stores', () => ({
+  progressStore: h.progressStore,
+  eventLog: h.eventLog,
+  settingsStore: h.settingsStore,
+}))
+
+const entry = {
+  id: 'pg-1661-a-scandal-in-bohemia',
+  title: 'A Scandal in Bohemia',
+  bookTitle: 'The Adventures of Sherlock Holmes',
+  isCollection: true,
+  textUrl: '/texts/pg-1661.epub',
+  startHref: 'OEBPS/x_1661-h-1.htm.xhtml#pgepubid00002',
+  endHref: 'OEBPS/x_1661-h-2.htm.xhtml#pgepubid00006',
+  readingMinutes: 37,
+}
+vi.mock('../../catalog', () => ({
+  getEntry: vi.fn(async (id: string) => (id === entry.id ? entry : undefined)),
+}))
+
+const SETTINGS = {
+  id: 'settings',
+  theme: 'paper',
+  font: 'literata',
+  textSize: 5,
+  mix: 'default',
+  aiPrefs: {},
+  contentFilters: {},
+}
+
+function loc(fraction: number, over: Partial<LocationInfo> = {}): LocationInfo {
+  return {
+    locator: `cfi-${Math.round(fraction * 100)}`,
+    fraction,
+    wordsLeft: 500,
+    minutesLeft: 3,
+    atStart: false,
+    atEnd: false,
+    ...over,
+  }
+}
+
+async function open(path = `/read/${entry.id}`) {
+  render(
+    <MemoryRouter initialEntries={[path]}>
+      <Routes>
+        <Route path="/" element={<p>HOME PAGE</p>} />
+        <Route path="/read/:id" element={<ReaderScreen />} />
+      </Routes>
+    </MemoryRouter>,
+  )
+  await waitFor(() => expect(h.engines).toHaveLength(1))
+  const engine = h.engines[0]
+  await waitFor(() =>
+    expect(screen.getByTestId('reader')).toHaveAttribute('data-phase', 'ready'),
+  )
+  return engine
+}
+
+beforeEach(() => {
+  h.engines.length = 0
+  h.failOpen.value = false
+  vi.clearAllMocks()
+  h.progressStore.get.mockResolvedValue(undefined)
+  h.settingsStore.get.mockResolvedValue({ ...SETTINGS })
+})
+
+describe('opening a story', () => {
+  it('opens the entry’s text through the engine with the story range and saved style', async () => {
+    const engine = await open()
+    expect(engine.open).toHaveBeenCalledWith(entry.textUrl, {
+      startHref: entry.startHref,
+      endHref: entry.endHref,
+      locator: undefined,
+    })
+    expect(engine.setStyle).toHaveBeenCalledWith({
+      font: 'literata',
+      sizeStep: 5,
+      theme: 'paper',
+    })
+    expect(h.eventLog.append).toHaveBeenCalledWith({
+      workId: entry.id,
+      type: 'open',
+    })
+    expect(screen.getByText(/A Scandal in Bohemia/)).toBeInTheDocument()
+  })
+
+  it('reopens where the reader left off', async () => {
+    h.progressStore.get.mockResolvedValue({
+      workId: entry.id,
+      locator: 'cfi-saved',
+      percent: 42,
+      secondsRead: 300,
+      updatedAt: 1,
+    })
+    const engine = await open()
+    expect(engine.open).toHaveBeenCalledWith(
+      entry.textUrl,
+      expect.objectContaining({ locator: 'cfi-saved' }),
+    )
+  })
+
+  it('starts a finished story again from the beginning', async () => {
+    h.progressStore.get.mockResolvedValue({
+      workId: entry.id,
+      locator: 'cfi-end',
+      percent: 100,
+      secondsRead: 900,
+      updatedAt: 1,
+    })
+    const engine = await open()
+    expect(engine.open).toHaveBeenCalledWith(
+      entry.textUrl,
+      expect.objectContaining({ locator: undefined }),
+    )
+  })
+
+  it('says so when the story is not in the catalog', async () => {
+    render(
+      <MemoryRouter initialEntries={['/read/nope']}>
+        <Routes>
+          <Route path="/read/:id" element={<ReaderScreen />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'We couldn’t find that story.',
+    )
+  })
+
+  it('shows what went wrong if the engine cannot open the story', async () => {
+    h.failOpen.value = true
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    render(
+      <MemoryRouter initialEntries={[`/read/${entry.id}`]}>
+        <Routes>
+          <Route path="/read/:id" element={<ReaderScreen />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Something went wrong opening this story.')
+    expect(alert).toHaveTextContent('the book file is damaged')
+    error.mockRestore()
+  })
+})
+
+describe('turning pages', () => {
+  it('turns with the tap zones', async () => {
+    const engine = await open()
+    fireEvent.click(screen.getByRole('button', { name: 'Next page' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Previous page' }))
+    expect(engine.next).toHaveBeenCalledTimes(1)
+    expect(engine.prev).toHaveBeenCalledTimes(1)
+  })
+
+  it('turns with the arrow keys, Page Up/Down and Space', async () => {
+    const engine = await open()
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    fireEvent.keyDown(window, { key: 'PageDown' })
+    fireEvent.keyDown(window, { key: ' ' })
+    expect(engine.next).toHaveBeenCalledTimes(3)
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    fireEvent.keyDown(window, { key: 'PageUp' })
+    expect(engine.prev).toHaveBeenCalledTimes(2)
+  })
+
+  it('hides and shows the controls when the middle is tapped', async () => {
+    await open()
+    expect(
+      screen.getByRole('button', { name: 'Text and theme settings' }),
+    ).toBeInTheDocument()
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Show or hide controls' }),
+    )
+    expect(
+      screen.queryByRole('button', { name: 'Text and theme settings' }),
+    ).not.toBeInTheDocument()
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Show or hide controls' }),
+    )
+    expect(
+      screen.getByRole('button', { name: 'Text and theme settings' }),
+    ).toBeInTheDocument()
+  })
+})
+
+describe('progress', () => {
+  it('shows progress and minutes left, and saves the position on every turn', async () => {
+    const engine = await open()
+    act(() => engine.locationCallbacks[0](loc(0.25, { minutesLeft: 28 })))
+    expect(
+      screen.getByRole('progressbar', { name: 'Progress through this story' }),
+    ).toHaveAttribute('aria-valuenow', '25')
+    expect(screen.getByTestId('minutes-left')).toHaveTextContent(
+      '28 min left in this story',
+    )
+    await waitFor(() =>
+      expect(h.progressStore.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workId: entry.id,
+          locator: 'cfi-25',
+          percent: 25,
+        }),
+      ),
+    )
+    act(() => engine.locationCallbacks[0](loc(0.3)))
+    await waitFor(() => expect(h.progressStore.set).toHaveBeenCalledTimes(2))
+  })
+
+  it('logs a progress event at each tenth', async () => {
+    const engine = await open()
+    act(() => engine.locationCallbacks[0](loc(0.05)))
+    act(() => engine.locationCallbacks[0](loc(0.12)))
+    await waitFor(() =>
+      expect(h.eventLog.append).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'progress', workId: entry.id }),
+      ),
+    )
+  })
+})
+
+describe('the Aa panel', () => {
+  it('applies a change at once, saves it, and does not reopen the story', async () => {
+    const engine = await open()
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Text and theme settings' }),
+    )
+    fireEvent.click(screen.getByRole('radio', { name: 'Night' }))
+    expect(engine.setStyle).toHaveBeenLastCalledWith({
+      font: 'literata',
+      sizeStep: 5,
+      theme: 'night',
+    })
+    expect(h.settingsStore.update).toHaveBeenCalledWith({
+      font: 'literata',
+      textSize: 5,
+      theme: 'night',
+    })
+    fireEvent.change(screen.getByRole('slider'), { target: { value: '8' } })
+    expect(engine.setStyle).toHaveBeenLastCalledWith({
+      font: 'literata',
+      sizeStep: 8,
+      theme: 'night',
+    })
+    fireEvent.click(
+      screen.getByRole('radio', { name: 'Atkinson Hyperlegible' }),
+    )
+    expect(h.settingsStore.update).toHaveBeenLastCalledWith({
+      font: 'atkinson',
+      textSize: 8,
+      theme: 'night',
+    })
+    expect(engine.open).toHaveBeenCalledTimes(1)
+    expect(h.engines).toHaveLength(1)
+  })
+
+  it('does not turn pages with the arrow keys while it is open', async () => {
+    const engine = await open()
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Text and theme settings' }),
+    )
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(engine.next).not.toHaveBeenCalled()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(
+      screen.queryByRole('dialog', { name: 'Text and theme settings' }),
+    ).not.toBeInTheDocument()
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(engine.next).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('finishing', () => {
+  it('shows the end screen, logs finished, and goes back from the button', async () => {
+    const engine = await open()
+    act(() => engine.locationCallbacks[0](loc(0.99, { atEnd: true })))
+    act(() => engine.endCallbacks[0]())
+    const end = await screen.findByTestId('end-screen')
+    expect(end).toHaveTextContent('A Scandal in Bohemia')
+    expect(end).toHaveTextContent('You finished it')
+    await waitFor(() =>
+      expect(h.eventLog.append).toHaveBeenCalledWith({
+        workId: entry.id,
+        type: 'finished',
+        value: 1,
+      }),
+    )
+    expect(h.progressStore.set).toHaveBeenLastCalledWith(
+      expect.objectContaining({ percent: 100 }),
+    )
+
+    // More "next" presses on the last page must not log it again, or turn anything.
+    act(() => engine.endCallbacks[0]())
+    expect(
+      h.eventLog.append.mock.calls.filter(
+        ([e]) => (e as { type: string }).type === 'finished',
+      ),
+    ).toHaveLength(1)
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Back to Your Shortlist' }),
+    )
+    expect(await screen.findByText('HOME PAGE')).toBeInTheDocument()
+  })
+
+  it('closes the engine when the screen is left', async () => {
+    const engine = await open()
+    fireEvent.click(screen.getByText('‹ Back'))
+    expect(engine.close).toHaveBeenCalled()
+  })
+})

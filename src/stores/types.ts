@@ -23,6 +23,8 @@ export type ReaderEventType =
   | 'love'
   | 'ok'
   | 'notForMe'
+  | 'open'
+  | 'progress'
   | 'finished'
   | 'stopped'
   | 'abandoned'

@@ -16,9 +16,14 @@
     "prebuild": "npm run catalog"
   },
   "dependencies": {
+    "@fontsource-variable/literata": "5.3.0",
+    "@fontsource/atkinson-hyperlegible": "5.3.0",
+    "@fontsource/opendyslexic": "5.3.0",
     "dexie": "^4.4.6",
+    "foliate-js": "1.0.1",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "react-router": "7.18.4"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
