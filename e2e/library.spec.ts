@@ -166,3 +166,52 @@ test('the reader has a dog-ear button that does not move the reading position', 
   await page.waitForTimeout(400)
   await expect(reader).toHaveAttribute('data-locator', place ?? '')
 })
+
+test('the end-of-story check-in records a rating, and the Library can rate later', async ({
+  page,
+}) => {
+  const id = 'pg-269-the-open-window'
+  await page.goto(`/read/${id}`)
+  await waitForReader(page)
+  const reader = page.getByTestId('reader')
+  for (let i = 0; i < 40; i++) {
+    if ((await reader.getAttribute('data-phase')) === 'finished') break
+    await page.keyboard.press('ArrowRight')
+    await page.waitForTimeout(150)
+  }
+  await expect(reader).toHaveAttribute('data-phase', 'finished')
+  const end = page.getByTestId('end-screen')
+  await end.getByRole('button', { name: 'Not for me' }).click()
+  await end.getByRole('button', { name: 'Too long' }).click()
+  await expect(end.getByTestId('check-in-done')).toContainText('Not for me')
+
+  const events = await page.evaluate(
+    () =>
+      new Promise<{ type: string; reason?: string }[]>((resolve) => {
+        const open = indexedDB.open('twice-told')
+        open.onsuccess = () => {
+          const all = open.result
+            .transaction('events')
+            .objectStore('events')
+            .getAll()
+          all.onsuccess = () => {
+            open.result.close()
+            resolve(all.result)
+          }
+        }
+      }),
+  )
+  expect(events.find((e) => e.type === 'notForMe')?.reason).toBe('too-long')
+  expect(events.some((e) => e.type === 'finished')).toBe(true)
+})
+
+test('Your taste in Settings starts empty and has a Reset button', async ({
+  page,
+}) => {
+  await page.goto('/settings')
+  await expect(page.getByRole('heading', { name: 'Your taste' })).toBeVisible()
+  await expect(page.getByText('Nothing yet.')).toHaveCount(2)
+  await page.getByRole('button', { name: 'Reset' }).click()
+  await page.getByRole('button', { name: 'Yes, reset' }).click()
+  await expect(page.getByText('Nothing yet.')).toHaveCount(2)
+})

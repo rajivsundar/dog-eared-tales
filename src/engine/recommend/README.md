@@ -20,3 +20,21 @@ profile yet, `mode` is `"starter"` and the mix is varied and short.
 
 Events used: `shown` (add one each time a card is displayed), `tap` (card opened), `open`, `save`,
 `love`, `finished`, `notForMe`.
+
+## Learning (`learn.ts`)
+
+The taste profile is rebuilt from the event log, so the log stays the source of truth. Each event pushes the moods, genres and length class of its story:
+
+| Event                                   | Push                |
+| --------------------------------------- | ------------------- |
+| Finished (including 90% or more)        | +1                  |
+| Loved it                                | +2 more (+3 in all) |
+| It was OK                               | +0 more (+1 in all) |
+| Not for me after finishing              | -2 more (-1 in all) |
+| Not for me from the shortlist           | -2                  |
+| Dog-ear (un-dog-ear cancels it)         | +0.75               |
+| Stopped (under 90%, not back in 7 days) | -0.5                |
+
+Not for me reasons aim the push: "too long" hits the length only, "not my genre" the genres only, "too dark" the mood dark (and nudges the story's other moods by -0.5), "too old-fashioned" is a mild -0.5, and "already read" teaches nothing.
+
+An event's push halves every 60 days. Each mood, genre and length weight is then kept between -5 and +8. A reset event makes everything before it count for nothing. The wildcard ranks as if no mood were marked down; excluded works are still skipped.

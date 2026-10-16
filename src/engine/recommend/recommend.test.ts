@@ -100,14 +100,14 @@ const catalog: CatalogEntry[] = [
 ]
 
 describe('scoring', () => {
-  it('gives an untouched facet a weight of 0.5, and moves it with the reader', () => {
+  it('gives an untouched facet a weight of 0.5; +8 is 1 and -5 is 0, and it stops there', () => {
     expect(facetWeight({}, 'mood:eerie')).toBe(0.5)
     expect(
       facetWeight({ 'mood:eerie': { success: 8, failure: 0 } }, 'mood:eerie'),
-    ).toBeCloseTo(0.9)
+    ).toBeCloseTo(1)
     expect(
       facetWeight({ 'mood:eerie': { success: 0, failure: 8 } }, 'mood:eerie'),
-    ).toBeCloseTo(0.1)
+    ).toBeCloseTo(0)
   })
 
   it('scores matching moods and genres above non-matching ones', () => {

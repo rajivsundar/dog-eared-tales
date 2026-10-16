@@ -11,6 +11,7 @@ import {
   undoRemove,
 } from './dailyShortlist'
 import { fakeCatalog, fakeStores } from './fakeStores'
+import { sweepStops } from './dailyShortlist'
 
 const catalog = fakeCatalog() as unknown as CatalogEntry[]
 const MORNING = new Date(2026, 9, 16, 9, 0)
@@ -24,6 +25,7 @@ function setup() {
     settings: s.settingsStore,
     profile: s.profileStore,
     events: s.eventLog,
+    progress: s.progressStore,
   }
   return { s, deps }
 }
@@ -156,5 +158,91 @@ describe('not for me and undo', () => {
     )
     expect(digestEvents(await s.eventLog.list()).notForMe.has(gone)).toBe(false)
     expect(ids(await loadShortlist(deps, LATER))).toEqual(ids(picks))
+  })
+})
+
+describe('learning and the daily list', () => {
+  const eerieIn = (picks: { entry: CatalogEntry }[]) =>
+    picks.filter((p) => p.entry.moods.includes('eerie')).length
+
+  it('Loved it on an eerie story: today stays fixed, tomorrow favours eerie picks', async () => {
+    const { s, deps } = setup()
+    const first = await loadShortlist(deps, MORNING)
+    // story-1 and story-6 are the eerie stories in the test catalog.
+    await s.eventLog.append({ workId: 'story-1', type: 'finished' })
+    await s.eventLog.append({ workId: 'story-1', type: 'love' })
+
+    // Later today: at most the finished pick is swapped. The other picks do not move.
+    const later = await loadShortlist(deps, LATER)
+    for (const [i, p] of first.entries()) {
+      if (p.entry.id !== 'story-1') expect(later[i]).toEqual(p)
+    }
+
+    // Tomorrow the other eerie story is on the list, and the rated one is not.
+    const tomorrow = await loadShortlist(deps, NEXT_DAY)
+    expect(ids(tomorrow)).toContain('story-6')
+    expect(ids(tomorrow)).not.toContain('story-1')
+    expect(eerieIn(tomorrow)).toBeGreaterThanOrEqual(1)
+    const stored = await s.profileStore.get()
+    expect(stored?.facetBeliefs['mood:eerie']?.success).toBeGreaterThan(0)
+  })
+
+  it('a replacement pick today already uses the new weights', async () => {
+    const { s, deps } = setup()
+    const picks = await loadShortlist(deps, MORNING)
+    const eerie = catalog.find((e) => e.moods.includes('eerie'))!
+    // Love an eerie story that is not on the list; the profile is not rebuilt for the list.
+    await s.eventLog.append({ workId: eerie.id, type: 'finished' })
+    await s.eventLog.append({ workId: eerie.id, type: 'love' })
+    const result = await removePick(deps, picks, picks[0].entry.id, LATER)
+    expect(result.replacement).toBeDefined()
+    expect(result.replacement!.entry.moods).toContain('eerie')
+  })
+})
+
+describe('stopping and finishing partway', () => {
+  const DAY = 24 * 60 * 60 * 1000
+  const later = (days: number) => new Date(Date.now() + days * DAY)
+  const progressAt = (
+    s: ReturnType<typeof fakeStores>,
+    id: string,
+    percent: number,
+  ) =>
+    s.progressStore.set({ workId: id, locator: 'x', percent, secondsRead: 5 })
+
+  it('counts 90% or more as finished on the next visit, once', async () => {
+    const { s, deps } = setup()
+    await progressAt(s, 'story-3', 93)
+    await sweepStops(deps, new Date())
+    await sweepStops(deps, new Date())
+    const finished = s.events.filter((e) => e.type === 'finished')
+    expect(finished).toEqual([expect.objectContaining({ workId: 'story-3' })])
+  })
+
+  it('counts a story left before 90% for 7 days as stopped, once', async () => {
+    const { s, deps } = setup()
+    await progressAt(s, 'story-3', 40)
+    await sweepStops(deps, later(6))
+    expect(s.events.filter((e) => e.type === 'stopped')).toHaveLength(0)
+    await sweepStops(deps, later(8))
+    await sweepStops(deps, later(9))
+    expect(s.events.filter((e) => e.type === 'stopped')).toEqual([
+      expect.objectContaining({ workId: 'story-3' }),
+    ])
+  })
+
+  it('does not count a stop for a story that was finished', async () => {
+    const { s, deps } = setup()
+    await progressAt(s, 'story-3', 40)
+    await s.eventLog.append({ workId: 'story-3', type: 'finished' })
+    await sweepStops(deps, later(30))
+    expect(s.events.filter((e) => e.type === 'stopped')).toHaveLength(0)
+  })
+
+  it('runs whenever the shortlist opens', async () => {
+    const { s, deps } = setup()
+    await progressAt(s, 'story-3', 95)
+    await loadShortlist(deps, later(0))
+    expect(s.events.some((e) => e.type === 'finished')).toBe(true)
   })
 })

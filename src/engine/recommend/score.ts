@@ -1,6 +1,7 @@
 import type { CatalogEntry, LengthClass } from '../../catalog'
 import type { Profile } from '../../stores'
 import type { History } from './history'
+import { WEIGHT_MAX, WEIGHT_MIN, netWeight } from './learn'
 
 type Beliefs = Profile['facetBeliefs']
 
@@ -28,11 +29,15 @@ export const SHOWN_WITHOUT_TAP_LIMIT = 3
 /** An essay (or any pick) must score at least this to count as "scoring reasonably". */
 export const REASONABLE_SCORE = 0.45
 
-/** A reader's weight for a mood or genre: 0 to 1, with 0.5 meaning "no opinion yet". */
+/**
+ * A reader's weight for a mood, genre or length class, from 0 to 1. 0.5 means "no opinion yet".
+ * The learned weight runs from WEIGHT_MIN (-5) to WEIGHT_MAX (+8): -5 is 0, 0 is 0.5, +8 is 1.
+ */
 export function facetWeight(beliefs: Beliefs, key: string): number {
-  const belief = beliefs[key]
-  if (!belief) return 0.5
-  return (belief.success + 1) / (belief.success + belief.failure + 2)
+  const net = netWeight(beliefs, key)
+  return net >= 0
+    ? 0.5 + (0.5 * net) / WEIGHT_MAX
+    : 0.5 + (0.5 * net) / -WEIGHT_MIN
 }
 
 function average(numbers: number[]): number {
@@ -142,7 +147,12 @@ export function scoreEntry(
   const parts: ScoreParts = {
     mood: moodMatch(entry, beliefs),
     genre: genreMatch(entry, beliefs),
-    length: lengthFit(entry.lengthClass, preferred),
+    // The distance fit, scaled by how much the reader likes this length (x1 when neutral).
+    length: Math.min(
+      1,
+      lengthFit(entry.lengthClass, preferred) *
+        (0.5 + facetWeight(beliefs, `length:${entry.lengthClass}`)),
+    ),
     novelty: noveltyBonus(entry.id, history),
     penalty: shownPenalty(entry.id, history),
   }

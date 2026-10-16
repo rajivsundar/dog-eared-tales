@@ -1,5 +1,7 @@
 export { recommend, DEFAULT_COUNT } from './recommend'
 export { digestEvents } from './history'
+export * from './learn'
+export { whyThisPick } from './why'
 export { REASONABLE_SCORE, SHOWN_WITHOUT_TAP_LIMIT, WEIGHTS } from './score'
 export type {
   RecommendInput,

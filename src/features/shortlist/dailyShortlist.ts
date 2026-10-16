@@ -1,6 +1,18 @@
 import type { CatalogEntry } from '../../catalog'
-import { digestEvents, recommend } from '../../engine/recommend'
-import type { EventLog, ProfileStore, SettingsStore } from '../../stores'
+import {
+  FINISHED_FRACTION,
+  STOP_AFTER_DAYS,
+  buildProfile,
+  digestEvents,
+  recommend,
+} from '../../engine/recommend'
+import type {
+  EventLog,
+  Profile,
+  ProfileStore,
+  ProgressStore,
+  SettingsStore,
+} from '../../stores'
 
 export interface ShortlistPick {
   entry: CatalogEntry
@@ -12,6 +24,7 @@ export interface ShortlistDeps {
   settings: SettingsStore
   profile: ProfileStore
   events: EventLog
+  progress: ProgressStore
 }
 
 /** The local calendar day as "YYYY-MM-DD". */
@@ -40,15 +53,77 @@ async function save(
   })
 }
 
+/** The taste profile as the event log says it is right now. */
+async function freshProfile(
+  deps: ShortlistDeps,
+  now: Date,
+): Promise<{
+  profile: Profile
+  events: Awaited<ReturnType<EventLog['list']>>
+}> {
+  const [stored, events] = await Promise.all([
+    deps.profile.get(),
+    deps.events.list(),
+  ])
+  return {
+    profile: buildProfile(deps.catalog, events, now.getTime(), stored),
+    events,
+  }
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/**
+ * Called whenever the shortlist opens. A story left at 90% or more counts as finished, and one
+ * left before 90% and not opened for 7 days counts as stopped. Each is logged once.
+ */
+export async function sweepStops(
+  deps: Pick<ShortlistDeps, 'events' | 'progress'>,
+  now: Date,
+): Promise<void> {
+  const [progress, events] = await Promise.all([
+    deps.progress.list(),
+    deps.events.list(),
+  ])
+  const lastAt = (workId: string, type: string): number =>
+    Math.max(
+      0,
+      ...events
+        .filter((e) => e.workId === workId && e.type === type)
+        .map((e) => e.at),
+    )
+  for (const p of progress) {
+    if (p.percent <= 0 || p.percent >= 100) continue
+    if (lastAt(p.workId, 'finished') >= p.updatedAt) continue
+    if (p.percent >= FINISHED_FRACTION * 100) {
+      await deps.events.append({
+        workId: p.workId,
+        type: 'finished',
+        value: p.percent / 100,
+        at: p.updatedAt,
+      })
+    } else if (
+      now.getTime() - p.updatedAt >= STOP_AFTER_DAYS * DAY_MS &&
+      lastAt(p.workId, 'stopped') < p.updatedAt
+    ) {
+      await deps.events.append({
+        workId: p.workId,
+        type: 'stopped',
+        value: p.percent / 100,
+        at: p.updatedAt + STOP_AFTER_DAYS * DAY_MS,
+      })
+    }
+  }
+}
+
 /** The best pick that is not already on the list, or undefined if there is none. */
 async function nextBest(
   deps: ShortlistDeps,
   taken: Set<string>,
+  now: Date,
 ): Promise<ShortlistPick | undefined> {
-  const [profile, events] = await Promise.all([
-    deps.profile.get(),
-    deps.events.list(),
-  ])
+  // A replacement uses the newest weights, even though the rest of today's list stays fixed.
+  const { profile, events } = await freshProfile(deps, now)
   const next = recommend({
     catalog: deps.catalog,
     profile,
@@ -74,6 +149,7 @@ async function swapFinished(
     const replacement = await nextBest(
       deps,
       new Set(current.map((p) => p.entry.id)),
+      now,
     )
     current = replacement
       ? current.map((p) => (p === done ? replacement : p))
@@ -91,6 +167,7 @@ export async function loadShortlist(
   deps: ShortlistDeps,
   now: Date,
 ): Promise<ShortlistPick[]> {
+  await sweepStops(deps, now)
   const settings = await deps.settings.get()
   const stored = settings.shortlist
   if (stored && stored.date === localDay(now) && stored.picks.length > 0) {
@@ -103,10 +180,9 @@ export async function loadShortlist(
       return swapFinished(deps, picks, now)
     }
   }
-  const [profile, events] = await Promise.all([
-    deps.profile.get(),
-    deps.events.list(),
-  ])
+  // A new day: learn from everything so far, keep the result, and pick from it.
+  const { profile, events } = await freshProfile(deps, now)
+  await deps.profile.put(profile)
   const picks = recommend({ catalog: deps.catalog, profile, events }).picks.map(
     (p) => ({ entry: p.entry, reason: p.reason }),
   )
@@ -159,6 +235,7 @@ export async function removePick(
   const replacement = await nextBest(
     deps,
     new Set(current.map((p) => p.entry.id)),
+    now,
   )
   const picks = replacement
     ? current.map((p) => (p.entry.id === workId ? replacement : p))

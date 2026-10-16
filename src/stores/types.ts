@@ -28,6 +28,7 @@ export type ReaderEventType =
   | 'shown'
   | 'tap'
   | 'undo'
+  | 'reset'
   | 'finished'
   | 'stopped'
   | 'abandoned'

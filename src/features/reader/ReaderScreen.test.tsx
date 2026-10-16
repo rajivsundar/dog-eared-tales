@@ -1,4 +1,11 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
@@ -455,5 +462,75 @@ describe('the dog-ear button', () => {
       reason: 'unsave',
     })
     expect(screen.getByRole('button', { name: 'Dog-eared' })).toBeVisible()
+  })
+})
+
+describe('the check-in', () => {
+  async function finish() {
+    const engine = await open()
+    act(() => engine.locationCallbacks[0](loc(0.99, { atEnd: true })))
+    act(() => engine.endCallbacks[0]())
+    return screen.findByTestId('end-screen')
+  }
+  const rated = () =>
+    h.eventLog.append.mock.calls
+      .map(([e]) => e as { type: string; reason?: string })
+      .filter((e) => ['love', 'ok', 'notForMe'].includes(e.type))
+
+  it('offers Loved it, It was OK and Not for me on the end screen', async () => {
+    const end = await finish()
+    for (const name of ['Loved it', 'It was OK', 'Not for me']) {
+      expect(within(end).getByRole('button', { name })).toBeInTheDocument()
+    }
+    expect(rated()).toHaveLength(0)
+  })
+
+  it('records Loved it for the work', async () => {
+    const end = await finish()
+    await act(async () => {
+      fireEvent.click(within(end).getByRole('button', { name: 'Loved it' }))
+    })
+    expect(h.eventLog.append).toHaveBeenCalledWith({
+      workId: entry.id,
+      type: 'love',
+    })
+    expect(within(end).getByTestId('check-in-done')).toHaveTextContent(
+      'Loved it',
+    )
+    // It was finished too.
+    expect(
+      h.eventLog.append.mock.calls.filter(
+        ([e]) => (e as { type: string }).type === 'finished',
+      ),
+    ).toHaveLength(1)
+  })
+
+  it('Not for me offers the reasons, and records the one chosen', async () => {
+    const end = await finish()
+    fireEvent.click(within(end).getByRole('button', { name: 'Not for me' }))
+    for (const name of [
+      'Too long',
+      'Not my genre',
+      'Too old-fashioned',
+      'Too dark',
+      'Already read',
+    ]) {
+      expect(within(end).getByRole('button', { name })).toBeInTheDocument()
+    }
+    await act(async () => {
+      fireEvent.click(within(end).getByRole('button', { name: 'Too long' }))
+    })
+    expect(rated()).toEqual([
+      { workId: entry.id, type: 'notForMe', reason: 'too-long' },
+    ])
+  })
+
+  it('the reason is optional: Skip still records Not for me', async () => {
+    const end = await finish()
+    fireEvent.click(within(end).getByRole('button', { name: 'Not for me' }))
+    await act(async () => {
+      fireEvent.click(within(end).getByRole('button', { name: 'Skip' }))
+    })
+    expect(rated()).toEqual([{ workId: entry.id, type: 'notForMe' }])
   })
 })

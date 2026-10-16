@@ -8,6 +8,9 @@ import {
   libraryStore,
   progressStore,
 } from '../../stores'
+import { CheckIn } from '../checkin/CheckIn'
+import { RATING_LABELS, recordRating } from '../checkin/rating'
+import type { Rating } from '../checkin/rating'
 import { minutesLabel } from '../detail/labels'
 import { UndoToast } from '../ui/UndoToast'
 import { type LibraryLists, sortLibrary } from './libraryLists'
@@ -52,6 +55,7 @@ export default function LibraryScreen() {
   const [lists, setLists] = useState<LibraryLists | null>(null)
   const [failed, setFailed] = useState(false)
   const [removed, setRemoved] = useState<Removed | null>(null)
+  const [rating, setRating] = useState<CatalogEntry | null>(null)
   // Writes run one after another, so a quick Undo never overtakes the removal.
   const writes = useRef<Promise<unknown>>(Promise.resolve())
   const enqueue = (task: () => Promise<unknown>): void => {
@@ -183,8 +187,27 @@ export default function LibraryScreen() {
       >
         {failed && <p role="alert">We couldn’t load your library.</p>}
         {!lists && !failed && <p className="text-muted">Loading…</p>}
-        {lists && <Panel tab={tab} lists={lists} onUnDogEar={unDogEar} />}
+        {lists && (
+          <Panel
+            tab={tab}
+            lists={lists}
+            onUnDogEar={unDogEar}
+            onRate={setRating}
+          />
+        )}
       </div>
+
+      {rating && (
+        <RateDialog
+          entry={rating}
+          onRate={(rate, reason) => {
+            recordRating(eventLog, rating.id, rate, reason)
+              .then(refresh)
+              .catch(fail)
+          }}
+          onClose={() => setRating(null)}
+        />
+      )}
 
       {removed && (
         <UndoToast
@@ -201,10 +224,12 @@ function Panel({
   tab,
   lists,
   onUnDogEar,
+  onRate,
 }: {
   tab: TabId
   lists: LibraryLists
   onUnDogEar: (saved: SavedWork) => void
+  onRate: (entry: CatalogEntry) => void
 }) {
   const count =
     tab === 'reading'
@@ -286,8 +311,8 @@ function Panel({
         ))}
 
       {tab === 'finished' &&
-        lists.finished.map(({ entry, at }) => (
-          <li key={entry.id} className="flex">
+        lists.finished.map(({ entry, at, rating }) => (
+          <li key={entry.id} className="flex items-stretch gap-2">
             <Link to={`/read/${entry.id}`} className={card}>
               <img src={entry.coverUrl} alt="" className={cover} />
               <span className="flex min-w-0 flex-col gap-1">
@@ -297,11 +322,70 @@ function Panel({
                 <span className="text-sm">{entry.author}</span>
                 <span className="text-sm text-muted">
                   Finished {finishDate(at)}
+                  {rating && ` · ${RATING_LABELS[rating]}`}
                 </span>
               </span>
             </Link>
+            {!rating && (
+              <button
+                type="button"
+                aria-label={`Rate ${entry.title}`}
+                onClick={() => onRate(entry)}
+                className="min-h-11 min-w-11 shrink-0 rounded-card border border-line px-3 text-sm font-semibold text-accent hover:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              >
+                Rate it
+              </button>
+            )}
           </li>
         ))}
     </ul>
+  )
+}
+
+/** The check-in in a small dialog, for rating a finished work from the Library. */
+function RateDialog({
+  entry,
+  onRate,
+  onClose,
+}: {
+  entry: CatalogEntry
+  onRate: (rating: Rating, reason?: string) => void
+  onClose: () => void
+}) {
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent): void => {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+  return (
+    <div className="fixed inset-0 z-20 flex items-end justify-center sm:items-center">
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-scrim"
+        onClick={onClose}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="rate-title"
+        className="relative w-full max-w-md rounded-t-2xl border border-line bg-surface p-5 text-center text-ink shadow-xl sm:rounded-2xl"
+      >
+        <h2 id="rate-title" className="font-serif text-xl font-bold">
+          {entry.title}
+        </h2>
+        <div className="mt-4">
+          <CheckIn onRate={onRate} />
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-4 min-h-11 px-4 text-muted underline"
+        >
+          Close
+        </button>
+      </div>
+    </div>
   )
 }

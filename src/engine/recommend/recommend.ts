@@ -81,9 +81,20 @@ function personalPicks(
     e.moods.every((m) => facetWeight(beliefs, `mood:${m}`) <= PICKED)
   const someUnpicked = (e: CatalogEntry) =>
     e.moods.some((m) => facetWeight(beliefs, `mood:${m}`) <= PICKED)
+  // The wildcard is ranked as if the reader had no dislikes of moods, so a mood they have marked
+  // down (say "too dark") cannot empty the slot. Excluded works are already out of the pool.
+  const wildRanked = pool
+    .map((e) =>
+      scoreEntry(e, {
+        beliefs: withoutNegativeMoods(beliefs),
+        preferred,
+        history,
+      }),
+    )
+    .sort(byScoreThenId)
   take(
-    ranked.find((s) => unpicked(s.entry)) ??
-      ranked.find((s) => someUnpicked(s.entry)),
+    wildRanked.find((s) => unpicked(s.entry)) ??
+      wildRanked.find((s) => someUnpicked(s.entry)),
     'wildcard',
   )
 
@@ -189,4 +200,16 @@ function facets(e: CatalogEntry): string[] {
     ...e.moods.map((m) => `mood:${m}`),
     ...e.genres.map((g) => `genre:${g}`),
   ]
+}
+
+/** A copy of the beliefs without any mood the reader has marked down. */
+function withoutNegativeMoods(
+  beliefs: NonNullable<RecommendInput['profile']>['facetBeliefs'],
+): typeof beliefs {
+  return Object.fromEntries(
+    Object.entries(beliefs).filter(
+      ([key, belief]) =>
+        !key.startsWith('mood:') || belief.success - belief.failure >= 0,
+    ),
+  )
 }

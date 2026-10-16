@@ -10,6 +10,7 @@ import {
   resolveTheme,
 } from '../../engine/reader'
 import { eventLog, progressStore, settingsStore } from '../../stores'
+import { recordRating } from '../checkin/rating'
 import { useDogEar } from '../library/useDogEar'
 import { UndoToast } from '../ui/UndoToast'
 import { AaPanel } from './AaPanel'
@@ -320,7 +321,15 @@ function Reader({ id }: { id: string }) {
       )}
 
       {phase === 'finished' && entry && (
-        <EndScreen title={entry.title} onBack={() => navigate('/')} />
+        <EndScreen
+          title={entry.title}
+          onBack={() => navigate('/')}
+          onRate={(rating, reason) =>
+            recordRating(eventLog, id, rating, reason).catch((error: unknown) =>
+              console.error(error),
+            )
+          }
+        />
       )}
 
       {phase === 'loading' && (

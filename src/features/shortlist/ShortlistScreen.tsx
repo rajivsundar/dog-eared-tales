@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react'
 import { loadCatalog } from '../../catalog'
-import { eventLog, profileStore, settingsStore } from '../../stores'
+import { buildProfile, whyThisPick } from '../../engine/recommend'
+import type { Profile } from '../../stores'
+import {
+  eventLog,
+  profileStore,
+  progressStore,
+  settingsStore,
+} from '../../stores'
 import { useDogEar } from '../library/useDogEar'
 import { UndoToast } from '../ui/UndoToast'
 import { DetailSheet } from '../detail/DetailSheet'
@@ -30,6 +37,7 @@ export function ShortlistScreen() {
   const [failed, setFailed] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
   const dogEar = useDogEar()
+  const [beliefs, setBeliefs] = useState<Profile['facetBeliefs']>({})
   const [removed, setRemoved] = useState<Removed | null>(null)
 
   useEffect(() => {
@@ -42,10 +50,16 @@ export function ShortlistScreen() {
           settings: settingsStore,
           profile: profileStore,
           events: eventLog,
+          progress: progressStore,
         }
         const list = await loadShortlist(deps, now)
         if (cancelled) return
         await recordShown(deps, list, now)
+        if (cancelled) return
+        setBeliefs(
+          buildProfile(catalog, await eventLog.list(), now.getTime())
+            .facetBeliefs,
+        )
         if (cancelled) return
         setCatalogDeps(deps)
         setPicks(list)
@@ -158,6 +172,7 @@ export function ShortlistScreen() {
         <DetailSheet
           entry={open.entry}
           reason={open.reason}
+          why={whyThisPick(open.entry, open.reason, beliefs)}
           dogEared={dogEar.ids.has(open.entry.id)}
           onClose={() => setOpenId(null)}
           onDogEar={() => onDogEar(open.entry.id)}

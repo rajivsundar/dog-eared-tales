@@ -11,6 +11,8 @@ import {
 interface Props {
   entry: CatalogEntry
   reason: string
+  /** The "Why this pick?" sentence. */
+  why: string
   dogEared: boolean
   onClose: () => void
   onDogEar: () => void
@@ -26,6 +28,7 @@ const buttonBase =
 export function DetailSheet({
   entry,
   reason,
+  why,
   dogEared,
   onClose,
   onDogEar,
@@ -105,6 +108,10 @@ export function DetailSheet({
               <p className="mt-2 text-sm font-medium text-accent">{reason}</p>
             </div>
           </div>
+
+          <p data-testid="why-this-pick" className="mt-4 text-sm">
+            <span className="font-semibold">Why this pick?</span> {why}
+          </p>
 
           <p className="mt-4 font-serif text-lg leading-snug">{entry.hook}</p>
           <p className="mt-2 text-base leading-relaxed">{entry.blurb}</p>

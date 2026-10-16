@@ -31,6 +31,7 @@ vi.mock('../../stores', () => {
     settingsStore: delegate('settingsStore'),
     eventLog: delegate('eventLog'),
     profileStore: delegate('profileStore'),
+    progressStore: delegate('progressStore'),
     libraryStore: delegate('libraryStore'),
   }
 })
@@ -163,6 +164,16 @@ describe('detail sheet', () => {
     ])
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('has a Why this pick? line', async () => {
+    renderHome()
+    const items = await screen.findAllByRole('listitem')
+    fireEvent.click(within(items[0]).getByRole('button'))
+    const sheet = await screen.findByRole('dialog')
+    expect(within(sheet).getByTestId('why-this-pick')).toHaveTextContent(
+      /Why this pick\?.+starter mix/,
+    )
   })
 
   it('says "from <book>" for a story in a collection', async () => {

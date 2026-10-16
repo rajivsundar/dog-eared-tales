@@ -1,4 +1,6 @@
 import type { CatalogEntry } from '../../catalog'
+import { workStates } from '../../engine/recommend'
+import type { Rating } from '../checkin/rating'
 import type { Progress, ReaderEvent, SavedWork } from '../../stores'
 
 /** Reading speed, as in the reader and the catalog. */
@@ -22,6 +24,8 @@ export interface FinishedItem {
   entry: CatalogEntry
   /** When the story was finished. */
   at: number
+  /** The reader's check-in answer, if they have given one. */
+  rating?: Rating
 }
 
 export interface LibraryLists {
@@ -50,6 +54,7 @@ export function sortLibrary(input: {
 }): LibraryLists {
   const byId = new Map(input.catalog.map((e) => [e.id, e]))
   const progressById = new Map(input.progress.map((p) => [p.workId, p]))
+  const states = workStates(input.events)
   const lastFinished = new Map<string, number>()
   for (const e of input.events) {
     if (e.type === 'finished') {
@@ -76,7 +81,11 @@ export function sortLibrary(input: {
       progress && finishedAt !== undefined && progress.updatedAt > finishedAt,
     )
     if (finishedAt !== undefined && !(turned && startedAgain)) {
-      lists.finished.push({ entry, at: finishedAt })
+      lists.finished.push({
+        entry,
+        at: finishedAt,
+        rating: states.get(id)?.rating?.type,
+      })
     } else if (progress && turned) {
       lists.reading.push({
         entry,

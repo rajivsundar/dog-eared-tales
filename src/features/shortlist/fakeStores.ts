@@ -2,6 +2,7 @@
 import type {
   EventLog,
   LibraryStore,
+  Profile,
   ProfileStore,
   Progress,
   ProgressStore,
@@ -46,10 +47,15 @@ export function fakeStores() {
     list: async () => [...events],
     listForWork: async (id) => events.filter((e) => e.workId === id),
   }
+  let profile: Profile | undefined
   const profileStore: ProfileStore = {
-    get: async () => undefined,
-    put: async () => {},
-    clear: async () => {},
+    get: async () => profile,
+    put: async (p) => {
+      profile = p
+    },
+    clear: async () => {
+      profile = undefined
+    },
   }
   const libraryStore: LibraryStore = {
     get: async (id) => library.get(id),

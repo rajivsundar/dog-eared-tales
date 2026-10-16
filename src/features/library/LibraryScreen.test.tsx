@@ -199,3 +199,72 @@ describe('un-dog-ear', () => {
     expect(stores.library.has('story-2')).toBe(false)
   })
 })
+
+describe('Rate it', () => {
+  const finishedAt = new Date(2026, 9, 14, 12).getTime()
+
+  it('shows Rate it on a finished work with no rating, and opens the check-in', async () => {
+    await stores.eventLog.append({
+      workId: 'story-2',
+      type: 'finished',
+      at: finishedAt,
+    })
+    renderLibrary('/library?tab=finished')
+    await screen.findByText('Story 2')
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Rate Story 2' }))
+    })
+    const dialog = screen.getByRole('dialog')
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Loved it' }))
+    })
+    expect(stores.events.filter((e) => e.type === 'love')).toEqual([
+      expect.objectContaining({ workId: 'story-2' }),
+    ])
+    // Once rated, the button is gone and the rating shows.
+    expect(
+      await screen.findByText(/Loved it$/, { selector: 'span' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Rate Story 2' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('does not show Rate it on a work that already has a rating', async () => {
+    await stores.eventLog.append({
+      workId: 'story-2',
+      type: 'finished',
+      at: finishedAt,
+    })
+    await stores.eventLog.append({
+      workId: 'story-2',
+      type: 'ok',
+      at: finishedAt + 1,
+    })
+    renderLibrary('/library?tab=finished')
+    await screen.findByText('Story 2')
+    expect(
+      screen.queryByRole('button', { name: /^Rate / }),
+    ).not.toBeInTheDocument()
+    expect(screen.getByText(/It was OK/)).toBeInTheDocument()
+  })
+
+  it('Not for me with a reason is recorded with that reason', async () => {
+    await stores.eventLog.append({
+      workId: 'story-2',
+      type: 'finished',
+      at: finishedAt,
+    })
+    renderLibrary('/library?tab=finished')
+    await screen.findByText('Story 2')
+    fireEvent.click(screen.getByRole('button', { name: 'Rate Story 2' }))
+    const dialog = screen.getByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Not for me' }))
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Too dark' }))
+    })
+    expect(stores.events.filter((e) => e.type === 'notForMe')).toEqual([
+      expect.objectContaining({ workId: 'story-2', reason: 'too-dark' }),
+    ])
+  })
+})
