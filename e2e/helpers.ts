@@ -22,16 +22,16 @@ export async function waitForReader(page: Page): Promise<void> {
 
 /**
  * Opens the app as a returning reader. A fresh browser starts onboarding, so this skips it
- * ("Skip setup") and waits for Your Shortlist.
+ * (Pick my moods first, then Skip) and waits for Your Shortlist.
  */
 export async function startApp(page: Page): Promise<void> {
   await page.goto('/')
-  const welcome = page.getByRole('button', { name: 'Find my first story' })
+  const welcome = page.getByRole('button', { name: 'Pick my moods first' })
   const cards = page.getByRole('listitem')
   await expect(welcome.or(cards.first())).toBeVisible()
   if (await welcome.isVisible()) {
     await welcome.click()
-    await page.getByRole('button', { name: 'Skip setup' }).click()
+    await page.getByRole('button', { name: 'Skip', exact: true }).click()
   }
   await expect(cards).toHaveCount(6)
 }

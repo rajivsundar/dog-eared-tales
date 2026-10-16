@@ -115,7 +115,7 @@ describe('About', () => {
       ),
     ).toBeInTheDocument()
     const redo = screen.getByRole('link', { name: 'Redo onboarding' })
-    expect(redo).toHaveAttribute('href', '/welcome')
+    expect(redo).toHaveAttribute('href', '/welcome?redo=1')
     // Following it records nothing and deletes nothing.
     await stores.eventLog.append({ workId: 'story-1', type: 'finished' })
     fireEvent.click(redo)

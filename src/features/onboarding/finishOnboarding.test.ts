@@ -7,7 +7,14 @@ import {
   localDay,
   removePick,
 } from '../shortlist/dailyShortlist'
-import { finishOnboarding, isFirstRun } from './finishOnboarding'
+import {
+  finishOnboarding,
+  hasAnsweredCards,
+  isFirstRun,
+  pickedMoods,
+  startWithStory,
+  tuneTaste,
+} from './finishOnboarding'
 import { ladderFor } from './moods'
 
 const catalog = fakeCatalog() as unknown as CatalogEntry[]
@@ -247,5 +254,122 @@ describe('reading context', () => {
     expect(ladderFor(['weekends'])).toBe(3)
     expect(ladderFor(['commute', 'weekends'])).toBe(2)
     expect(ladderFor(['commute', 'lunch', 'evenings'])).toBe(1)
+  })
+})
+
+describe('"Read a short story now" (startWithStory)', () => {
+  it('saves an empty profile and nothing else, so the welcome never shows again', async () => {
+    const { s, deps } = setup()
+    expect(await isFirstRun(deps)).toBe(true)
+    await startWithStory(deps)
+    const profile = (await s.profileStore.get())!
+    expect(profile.facetBeliefs).toEqual({})
+    expect(s.events).toHaveLength(0)
+    expect(await isFirstRun(deps)).toBe(false)
+  })
+
+  it('does not overwrite a profile that is already there', async () => {
+    const { s, deps } = setup()
+    await finishOnboarding(deps, { moods: ['eerie', 'cozy'], cards: {} }, TODAY)
+    const before = await s.profileStore.get()
+    await startWithStory(deps)
+    expect(await s.profileStore.get()).toEqual(before)
+  })
+
+  it('the first rating after the story seeds the profile, and the next shortlist reflects it', async () => {
+    const { s, deps } = setup()
+    await startWithStory(deps)
+    await s.eventLog.append({
+      workId: 'story-1',
+      type: 'finished',
+      at: TODAY.getTime() - 1000,
+    })
+    await s.eventLog.append({
+      workId: 'story-1',
+      type: 'love',
+      at: TODAY.getTime() - 500,
+    })
+    const picks = await loadShortlist(deps, TODAY)
+    expect(picks).toHaveLength(6)
+    const profile = (await s.profileStore.get())!
+    expect(netWeight(profile.facetBeliefs, 'mood:eerie')).toBeGreaterThan(2)
+    // The story just read is not offered again.
+    expect(ids(picks)).not.toContain('story-1')
+  })
+})
+
+describe('"Tune your picks" (tuneTaste)', () => {
+  it('saves the card answers without a new start marker, so earlier mood picks still count', async () => {
+    const { s, deps } = setup()
+    await finishOnboarding(deps, { moods: ['eerie', 'cozy'], cards: {} }, TODAY)
+    await tuneTaste(deps, { 'story-2': 'love', 'story-3': 'maybe' }, TODAY)
+    const reasons = onboardEvents(s).map((e) => e.reason)
+    expect(reasons).toEqual([
+      'start',
+      'mood:eerie',
+      'mood:cozy',
+      'love',
+      'maybe',
+    ])
+    expect(reasons.filter((r) => r === 'start')).toHaveLength(1)
+    const profile = (await s.profileStore.get())!
+    // eerie: +1 for the pick, still there. funny (story-2): +1.5 from the Love card.
+    expect(netWeight(profile.facetBeliefs, 'mood:eerie')).toBeCloseTo(1, 2)
+    expect(netWeight(profile.facetBeliefs, 'mood:funny')).toBeCloseTo(1.5, 2)
+  })
+
+  it('works after "Read a short story now", where there was no start marker', async () => {
+    const { s, deps } = setup()
+    await startWithStory(deps)
+    await tuneTaste(deps, { 'story-2': 'love' }, TODAY)
+    expect(onboardEvents(s).map((e) => e.reason)).toEqual(['love'])
+    expect(
+      netWeight((await s.profileStore.get())!.facetBeliefs, 'mood:funny'),
+    ).toBeCloseTo(1.5, 2)
+  })
+
+  it('rebuilds today’s shortlist at once', async () => {
+    const { s, deps } = setup()
+    await finishOnboarding(deps, { moods: ['eerie', 'cozy'], cards: {} }, TODAY)
+    const before = (await s.settingsStore.get()).shortlist!.picks.map(
+      (p) => p.workId,
+    )
+    // Love a story that is not on the list.
+    const outsider = catalog.find((e) => !before.includes(e.id))!
+    await tuneTaste(deps, { [outsider.id]: 'love' }, TODAY)
+    const after = (await s.settingsStore.get()).shortlist!
+    expect(after.date).toBe(localDay(TODAY))
+    expect(after.picks).toHaveLength(6)
+    expect(after.picks.map((p) => p.workId)).not.toEqual(before)
+  })
+
+  it('keeps the first-shortlist rules: skips Not for me cards today and holds a Loved one', async () => {
+    const { s, deps } = setup()
+    await finishOnboarding(deps, { moods: ['eerie', 'cozy'], cards: {} }, TODAY)
+    const lead = (await s.settingsStore.get()).shortlist!.picks[0].workId
+    const first = (await s.settingsStore.get()).shortlist!.picks.map(
+      (p) => p.workId,
+    )
+    const loved = catalog.find(
+      (e) => !first.includes(e.id) && e.id !== lead,
+    )!.id
+    await tuneTaste(deps, { [lead]: 'notForMe', [loved]: 'love' }, TODAY)
+    const saved = (await s.settingsStore.get()).shortlist!
+    const list = saved.picks.map((p) => p.workId)
+    expect(list).not.toContain(lead)
+    expect(list).toContain(loved)
+    expect(saved.avoid).toEqual([lead])
+    // Not for me on a card is only a weak signal: it is not a Not for me event.
+    expect(s.events.some((e) => e.type === 'notForMe')).toBe(false)
+  })
+
+  it('reports which moods were picked and whether any card was answered', async () => {
+    const { s, deps } = setup()
+    expect(pickedMoods([])).toEqual([])
+    await finishOnboarding(deps, { moods: ['eerie', 'cozy'], cards: {} }, TODAY)
+    expect(pickedMoods(await s.eventLog.list())).toEqual(['eerie', 'cozy'])
+    expect(hasAnsweredCards(await s.eventLog.list())).toBe(false)
+    await tuneTaste(deps, { 'story-2': 'maybe' }, TODAY)
+    expect(hasAnsweredCards(await s.eventLog.list())).toBe(true)
   })
 })

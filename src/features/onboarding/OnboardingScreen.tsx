@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { useNavigate } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
+import { welcomeContent } from '../../app/seasons'
 import { type CatalogEntry, loadCatalog } from '../../catalog'
 import { type CardAnswer, pickTasteCards } from '../../engine/recommend'
 import { eventLog, profileStore, settingsStore } from '../../stores'
-import { minutesLabel } from '../detail/labels'
-import { finishOnboarding } from './finishOnboarding'
+import { finishOnboarding, startWithStory } from './finishOnboarding'
+import { type WelcomeView, welcomeView } from './featuredStory'
 import { MAX_MOODS, MIN_MOODS, MOODS, READING_TIMES, ladderFor } from './moods'
+import { TasteCards } from './TasteCards'
+import { WelcomeHero } from './WelcomeHero'
 
 type Step = 'welcome' | 'mood' | 'cards' | 'context'
 
@@ -14,19 +17,21 @@ const primary =
   'inline-flex min-h-11 items-center justify-center rounded-full bg-accent px-6 text-base font-semibold text-accent-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50'
 const secondary =
   'inline-flex min-h-11 items-center justify-center rounded-full border border-line px-5 text-base focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
-const linkButton =
-  'inline-flex min-h-11 items-center px-2 text-sm text-muted underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
 
-const CARD_CHOICES: { value: CardAnswer; label: string }[] = [
-  { value: 'love', label: 'Love' },
-  { value: 'maybe', label: 'Maybe' },
-  { value: 'notForMe', label: 'Not for me' },
-]
-
-/** First-run onboarding at /welcome: welcome, mood board, taste cards, reading context. */
+/**
+ * Onboarding at /welcome.
+ * First run: the welcome page, then either "Read a short story now" (straight into the reader) or
+ * the mood board and Your Shortlist.
+ * "Redo onboarding" (/welcome?redo=1, from Settings) runs the full flow: moods, taste cards and
+ * reading context.
+ */
 export default function OnboardingScreen() {
   const navigate = useNavigate()
-  const [step, setStep] = useState<Step>('welcome')
+  const [params] = useSearchParams()
+  const full = params.get('redo') === '1'
+
+  const [step, setStep] = useState<Step>(full ? 'mood' : 'welcome')
+  const [now] = useState(() => new Date())
   const [catalog, setCatalog] = useState<CatalogEntry[] | null>(null)
   const [moods, setMoods] = useState<string[]>([])
   const [cards, setCards] = useState<Record<string, CardAnswer>>({})
@@ -56,11 +61,24 @@ export default function OnboardingScreen() {
     headingRef.current?.focus()
   }, [step])
 
-  // The cards are chosen when the reader arrives at the step, from the moods picked by then.
-  const goToCards = (picked: string[]): void => {
-    setMoods(picked)
-    setTasteCards(catalog ? pickTasteCards(catalog, picked) : [])
-    setStep('cards')
+  const content = welcomeContent(now)
+  const view: WelcomeView = catalog
+    ? welcomeView(content, catalog)
+    : { content, featured: undefined, covers: [] }
+
+  const fail = (error: unknown): void => {
+    console.error(error)
+    setBusy(false)
+    setFailed(true)
+  }
+
+  /** "Read a short story now": an empty profile (so this page never returns), then the reader. */
+  const readNow = (): void => {
+    if (!view.featured || busy) return
+    setBusy(true)
+    startWithStory({ profile: profileStore })
+      .then(() => navigate(`/read/${view.featured!.id}`, { replace: true }))
+      .catch(fail)
   }
 
   const finish = (answers: {
@@ -80,14 +98,15 @@ export default function OnboardingScreen() {
       answers,
     )
       .then(() => navigate('/', { replace: true }))
-      .catch((error: unknown) => {
-        console.error(error)
-        setBusy(false)
-        setFailed(true)
-      })
+      .catch(fail)
   }
 
-  const skipSetup = (): void => finish({ moods: [], cards: {} })
+  // The cards are chosen when the reader arrives at the step, from the moods picked by then.
+  const goToCards = (picked: string[]): void => {
+    setMoods(picked)
+    setTasteCards(catalog ? pickTasteCards(catalog, picked) : [])
+    setStep('cards')
+  }
 
   const toggleMood = (id: string): void => {
     setMoods((prev) =>
@@ -111,7 +130,7 @@ export default function OnboardingScreen() {
   )
 
   return (
-    <main className="mx-auto max-w-3xl px-gutter py-8 sm:py-12">
+    <main className="mx-auto max-w-5xl px-gutter py-8 sm:py-12">
       {failed && (
         <p role="alert" className="mb-4">
           Something went wrong. Please try again.
@@ -119,32 +138,17 @@ export default function OnboardingScreen() {
       )}
 
       {step === 'welcome' && (
-        <section aria-labelledby="welcome-title" className="text-center">
-          <h1
-            id="welcome-title"
-            ref={headingRef}
-            tabIndex={-1}
-            className="mt-10 font-serif text-4xl font-bold outline-none sm:text-5xl"
-          >
-            Twice Told
-          </h1>
-          <p className="mt-4 text-lg text-muted">
-            Great free stories, picked for you. Start short. Fall for the
-            classics.
-          </p>
-          <p className="mt-6">Your reading data stays on this device</p>
-          <button
-            type="button"
-            className={`${primary} mt-8`}
-            onClick={() => setStep('mood')}
-          >
-            Find my first story
-          </button>
-        </section>
+        <WelcomeHero
+          view={view}
+          headingRef={headingRef}
+          busy={busy}
+          onReadNow={readNow}
+          onPickMoods={() => setStep('mood')}
+        />
       )}
 
       {step === 'mood' && (
-        <section aria-labelledby="mood-title">
+        <section aria-labelledby="mood-title" className="mx-auto max-w-3xl">
           {heading('mood-title', 'What are you in the mood for?')}
           <p className="mt-2 text-muted">
             Pick {MIN_MOODS} to {MAX_MOODS} moods.
@@ -187,26 +191,32 @@ export default function OnboardingScreen() {
             <button
               type="button"
               className={secondary}
-              onClick={() => setStep('welcome')}
+              onClick={() =>
+                full ? navigate('/settings') : setStep('welcome')
+              }
             >
               Back
             </button>
             <button
               type="button"
               className={primary}
+              disabled={!catalog || busy || moods.length < MIN_MOODS}
               aria-describedby={
                 moods.length < MIN_MOODS ? 'mood-hint' : undefined
               }
-              disabled={!catalog || moods.length < MIN_MOODS}
-              onClick={() => goToCards(moods)}
+              onClick={() =>
+                full ? goToCards(moods) : finish({ moods, cards: {} })
+              }
             >
-              Next
+              {full ? 'Next' : 'Show my shortlist'}
             </button>
             <button
               type="button"
               className={secondary}
-              disabled={!catalog}
-              onClick={() => goToCards([])}
+              disabled={!catalog || busy}
+              onClick={() =>
+                full ? goToCards([]) : finish({ moods: [], cards: {} })
+              }
             >
               Skip
             </button>
@@ -217,74 +227,23 @@ export default function OnboardingScreen() {
               balanced mix.
             </p>
           )}
-          <button
-            type="button"
-            className={`${linkButton} mt-4`}
-            onClick={skipSetup}
-          >
-            Skip setup
-          </button>
         </section>
       )}
 
       {step === 'cards' && (
-        <section aria-labelledby="cards-title">
+        <section aria-labelledby="cards-title" className="mx-auto max-w-3xl">
           {heading('cards-title', 'Which of these catch your eye?')}
           <p className="mt-2 text-muted">
             Judge each by its first line. You can leave any unanswered.
           </p>
           {!catalog && !failed && <p className="mt-4 text-muted">Loading…</p>}
-          <ul className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {tasteCards.map((entry) => (
-              <li key={entry.id}>
-                <fieldset className="flex h-full flex-col rounded-card border border-line bg-surface p-3">
-                  <legend className="sr-only">
-                    Your reaction to {entry.title}
-                  </legend>
-                  <div className="flex gap-3">
-                    <img
-                      src={entry.coverUrl}
-                      alt=""
-                      className="h-28 w-[4.5rem] shrink-0 rounded-md border border-line object-cover"
-                    />
-                    <div className="min-w-0">
-                      <p className="font-serif text-lg leading-snug font-bold">
-                        {entry.title}
-                      </p>
-                      <p className="mt-1 text-sm text-muted">
-                        {minutesLabel(entry.readingMinutes)}
-                      </p>
-                      <blockquote className="mt-2 font-serif text-sm italic">
-                        {entry.firstLine}
-                      </blockquote>
-                    </div>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {CARD_CHOICES.map((choice) => (
-                      <label key={choice.value} className="flex-1">
-                        <input
-                          type="radio"
-                          name={`card-${entry.id}`}
-                          value={choice.value}
-                          checked={cards[entry.id] === choice.value}
-                          onChange={() =>
-                            setCards((prev) => ({
-                              ...prev,
-                              [entry.id]: choice.value,
-                            }))
-                          }
-                          className="peer sr-only"
-                        />
-                        <span className="flex min-h-11 cursor-pointer items-center justify-center rounded-full border border-line px-3 text-sm peer-checked:border-accent peer-checked:bg-accent peer-checked:font-semibold peer-checked:text-accent-ink peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent">
-                          {choice.label}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-              </li>
-            ))}
-          </ul>
+          <TasteCards
+            cards={tasteCards}
+            answers={cards}
+            onAnswer={(id, answer) =>
+              setCards((prev) => ({ ...prev, [id]: answer }))
+            }
+          />
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <button
               type="button"
@@ -300,15 +259,12 @@ export default function OnboardingScreen() {
             >
               Next
             </button>
-            <button type="button" className={linkButton} onClick={skipSetup}>
-              Skip setup
-            </button>
           </div>
         </section>
       )}
 
       {step === 'context' && (
-        <section aria-labelledby="context-title">
+        <section aria-labelledby="context-title" className="mx-auto max-w-3xl">
           {heading('context-title', 'When do you usually read?')}
           <p className="mt-2 text-muted">
             Optional. Pick any that fit. It sets how long your first stories

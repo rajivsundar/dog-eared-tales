@@ -17,6 +17,8 @@ import { UndoToast } from '../ui/UndoToast'
 import { DetailSheet } from '../detail/DetailSheet'
 import { minutesLabel } from '../detail/labels'
 import { requestPersistenceIfEarned } from '../storage/persistence'
+import { TuneCard } from '../onboarding/TuneCard'
+import { hasAnsweredCards } from '../onboarding/finishOnboarding'
 import { OfflineBadge } from '../offline/OfflineBadge'
 import { useAutoCache, useCachedTexts } from '../offline/useOffline'
 import { LongListSection } from './LongListSection'
@@ -55,6 +57,7 @@ export function ShortlistScreen() {
   const cached = useCachedTexts()
   const [beliefs, setBeliefs] = useState<Profile['facetBeliefs']>({})
   const [removed, setRemoved] = useState<Removed | null>(null)
+  const [showTune, setShowTune] = useState(false)
   const [longPicks, setLongPicks] = useState<ShortlistPick[]>([])
   const [sitting, setSitting] = useState(15)
 
@@ -85,6 +88,13 @@ export function ShortlistScreen() {
         await recordShown(deps, [...list, ...long], now)
         if (cancelled) return
         const events = await eventLog.list()
+        // "Tune your picks": after the first finished story, until dismissed or the cards are done.
+        const settings = await settingsStore.get()
+        setShowTune(
+          !settings.tuneDismissed &&
+            events.some((e) => e.type === 'finished') &&
+            !hasAnsweredCards(events),
+        )
         setBeliefs(buildProfile(catalog, events, now.getTime()).facetBeliefs)
         setSitting(sittingMinutes(events))
         if (cancelled) return
@@ -173,6 +183,14 @@ export function ShortlistScreen() {
 
   return (
     <>
+      {showTune && (
+        <TuneCard
+          onDismiss={() => {
+            setShowTune(false)
+            settingsStore.update({ tuneDismissed: true }).catch(fail)
+          }}
+        />
+      )}
       <section aria-labelledby="shortlist-title" className="mt-8">
         <h2
           id="shortlist-title"

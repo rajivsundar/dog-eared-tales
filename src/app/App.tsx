@@ -13,6 +13,7 @@ const ReaderScreen = lazy(() => import('../features/reader/ReaderScreen'))
 const OnboardingScreen = lazy(
   () => import('../features/onboarding/OnboardingScreen'),
 )
+const TuneScreen = lazy(() => import('../features/onboarding/TuneScreen'))
 const LibraryScreen = lazy(() => import('../features/library/LibraryScreen'))
 
 function NotFound() {
@@ -63,6 +64,7 @@ export default function App() {
             <Route path="*" element={<NotFound />} />
           </Route>
           <Route path="/welcome" element={<OnboardingScreen />} />
+          <Route path="/tune" element={<TuneScreen />} />
           <Route path="/read/:id" element={<ReaderScreen />} />
         </Routes>
       </Suspense>

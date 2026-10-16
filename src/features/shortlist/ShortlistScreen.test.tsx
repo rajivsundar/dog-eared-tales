@@ -662,3 +662,58 @@ describe('offline books', () => {
     )
   })
 })
+
+describe('the Tune your picks card', () => {
+  const tune = () => screen.queryByRole('region', { name: 'Tune your picks' })
+  const finishOne = () =>
+    stores.eventLog.append({ workId: 'story-1', type: 'finished', at: 1 })
+
+  it('is not shown before the first finished story', async () => {
+    renderHome()
+    await screen.findAllByRole('listitem')
+    expect(tune()).not.toBeInTheDocument()
+  })
+
+  it('is shown at the top after the first finished story, with a link to the taste cards', async () => {
+    await finishOne()
+    renderHome()
+    const card = await screen.findByRole('region', { name: 'Tune your picks' })
+    expect(
+      within(card).getByRole('link', { name: 'Tune now' }),
+    ).toHaveAttribute('href', '/tune')
+    // It sits above Your Shortlist.
+    const shortlist = screen.getByRole('heading', { name: /Shortlist/ })
+    expect(
+      card.compareDocumentPosition(shortlist) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
+  it('can be dismissed, and stays dismissed', async () => {
+    await finishOne()
+    const first = renderHome()
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Dismiss Tune your picks' }),
+    )
+    expect(tune()).not.toBeInTheDocument()
+    await waitFor(async () =>
+      expect((await stores.settingsStore.get()).tuneDismissed).toBe(true),
+    )
+    first.unmount()
+    renderHome()
+    await screen.findAllByRole('listitem')
+    expect(tune()).not.toBeInTheDocument()
+  })
+
+  it('is not shown once the taste cards have been answered', async () => {
+    await finishOne()
+    await stores.eventLog.append({
+      workId: 'story-3',
+      type: 'onboard',
+      reason: 'love',
+    })
+    renderHome()
+    await screen.findAllByRole('listitem')
+    expect(tune()).not.toBeInTheDocument()
+  })
+})

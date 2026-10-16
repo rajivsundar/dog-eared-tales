@@ -55,7 +55,7 @@ describe('App', () => {
   it('sends a first-time reader (no profile, no events) to onboarding', async () => {
     renderAt('/')
     expect(
-      await screen.findByRole('button', { name: 'Find my first story' }),
+      await screen.findByRole('button', { name: 'Pick my moods first' }),
     ).toBeInTheDocument()
     // Onboarding has no bottom navigation.
     expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull()

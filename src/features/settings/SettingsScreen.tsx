@@ -177,7 +177,7 @@ export function SettingsScreen() {
           history stays as it is.
         </p>
         <Link
-          to="/welcome"
+          to="/welcome?redo=1"
           className="mt-3 inline-flex min-h-11 items-center rounded-full border border-line px-5 font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           Redo onboarding

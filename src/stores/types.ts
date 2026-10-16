@@ -112,6 +112,8 @@ export interface Settings {
   persistence?: { requested: boolean; granted: boolean }
   /** The install offer on the end screen is shown once. */
   installOffered?: boolean
+  /** The "Tune your picks" card on Your Shortlist was dismissed. */
+  tuneDismissed?: boolean
 }
 
 export interface ProfileStore {

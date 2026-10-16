@@ -2,11 +2,18 @@ import type { CatalogEntry } from '../../catalog'
 import {
   ONBOARD_START,
   ONBOARD_WORK,
+  type CardAnswer,
   buildProfile,
   firstShortlist,
-  type CardAnswer,
+  onboardingAnswers,
 } from '../../engine/recommend'
-import type { EventLog, ProfileStore, SettingsStore } from '../../stores'
+import type {
+  EventLog,
+  Profile,
+  ProfileStore,
+  ReaderEvent,
+  SettingsStore,
+} from '../../stores'
 import { saveFirstShortlist } from '../shortlist/dailyShortlist'
 
 export interface OnboardingDeps {
@@ -37,41 +44,65 @@ export async function isFirstRun(
 }
 
 /**
- * Ends onboarding. Writes the answers as events (a start marker, then the moods, then the cards),
- * rebuilds the profile from the event log, and stores the first Your Shortlist: it leaves out the
- * cards answered Not for me for today, and holds a Loved card if there was one.
- * With no answers at all ("Skip setup") it records only the start marker, so the starter mix applies.
+ * "Read a short story now": saves an empty profile, so the welcome page never shows again. The
+ * reader's first rating (the check-in after the story) seeds the profile from there.
  */
-export async function finishOnboarding(
-  deps: OnboardingDeps,
-  answers: OnboardingAnswers,
-  now: Date = new Date(),
+export async function startWithStory(
+  deps: Pick<OnboardingDeps, 'profile'>,
 ): Promise<void> {
-  // Explicit, rising times keep the order exact however fast the writes are.
-  const base = now.getTime()
+  const existing = await deps.profile.get()
+  if (existing) return
+  await deps.profile.put({
+    id: 'profile',
+    tasteVector: [],
+    facetBeliefs: {},
+    ladderLevel: 0,
+    wordsPerMinute: 238,
+    version: 2,
+  })
+}
+
+/** Appends onboarding events with explicit, rising times, so the order is exact. */
+async function appendOnboardEvents(
+  events: EventLog,
+  base: number,
+  items: { workId: string; reason: string }[],
+): Promise<number> {
   let n = 0
-  const append = (workId: string, reason: string) =>
-    deps.events.append({ workId, type: 'onboard', reason, at: base + n++ })
-
-  await append(ONBOARD_WORK, ONBOARD_START)
-  for (const mood of answers.moods) await append(ONBOARD_WORK, `mood:${mood}`)
-  for (const [workId, answer] of Object.entries(answers.cards)) {
-    await append(workId, answer)
+  for (const item of items) {
+    await events.append({
+      workId: item.workId,
+      type: 'onboard',
+      reason: item.reason,
+      at: base + n++,
+    })
   }
+  return n
+}
 
+/**
+ * Rebuilds the profile from the event log and stores a fresh Your Shortlist for today: it leaves
+ * out taste cards answered Not for me (for today only) and holds a Loved card if there was one.
+ */
+async function rebuildShortlist(
+  deps: OnboardingDeps,
+  cards: Record<string, CardAnswer>,
+  now: Date,
+  ladderLevel: number | undefined,
+): Promise<Profile> {
   const [stored, events] = await Promise.all([
     deps.profile.get(),
     deps.events.list(),
   ])
-  const profile = buildProfile(deps.catalog, events, base + n, {
-    ladderLevel: answers.ladderLevel ?? stored?.ladderLevel ?? 0,
+  const profile = buildProfile(deps.catalog, events, now.getTime() + 1000, {
+    ladderLevel: ladderLevel ?? stored?.ladderLevel ?? 0,
   })
   await deps.profile.put(profile)
 
-  const avoid = Object.entries(answers.cards)
+  const avoid = Object.entries(cards)
     .filter(([, a]) => a === 'notForMe')
     .map(([id]) => id)
-  const loved = Object.entries(answers.cards)
+  const loved = Object.entries(cards)
     .filter(([, a]) => a === 'love')
     .map(([id]) => id)
   const picks = firstShortlist({
@@ -87,4 +118,60 @@ export async function finishOnboarding(
     avoid,
     now,
   )
+  return profile
+}
+
+/**
+ * Ends onboarding. Writes the answers as events (a start marker, then the moods, then any cards),
+ * rebuilds the profile from the event log, and stores the first Your Shortlist.
+ * With no answers at all ("Skip") it records only the start marker, so the starter mix applies.
+ */
+export async function finishOnboarding(
+  deps: OnboardingDeps,
+  answers: OnboardingAnswers,
+  now: Date = new Date(),
+): Promise<void> {
+  const base = now.getTime()
+  await appendOnboardEvents(deps.events, base, [
+    { workId: ONBOARD_WORK, reason: ONBOARD_START },
+    ...answers.moods.map((mood) => ({
+      workId: ONBOARD_WORK,
+      reason: `mood:${mood}`,
+    })),
+    ...Object.entries(answers.cards).map(([workId, answer]) => ({
+      workId,
+      reason: answer,
+    })),
+  ])
+  await rebuildShortlist(deps, answers.cards, now, answers.ladderLevel)
+}
+
+/**
+ * "Tune your picks": saves the taste-card answers as events (with no new start marker, so the
+ * moods picked earlier still count), then rebuilds today's shortlist at once.
+ */
+export async function tuneTaste(
+  deps: OnboardingDeps,
+  cards: Record<string, CardAnswer>,
+  now: Date = new Date(),
+): Promise<void> {
+  await appendOnboardEvents(
+    deps.events,
+    now.getTime(),
+    Object.entries(cards).map(([workId, answer]) => ({
+      workId,
+      reason: answer,
+    })),
+  )
+  await rebuildShortlist(deps, cards, now, undefined)
+}
+
+/** The moods picked in the newest onboarding run, for choosing taste cards. */
+export function pickedMoods(events: ReaderEvent[]): string[] {
+  return onboardingAnswers(events).moods.map((m) => m.name)
+}
+
+/** Has the reader answered any taste cards in the newest onboarding run? */
+export function hasAnsweredCards(events: ReaderEvent[]): boolean {
+  return onboardingAnswers(events).cards.length > 0
 }
