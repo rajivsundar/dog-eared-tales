@@ -24,4 +24,34 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    // Only src/stores/ may touch IndexedDB.
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/stores/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'dexie',
+              message:
+                'Only src/stores/ may use Dexie. Use the store interfaces.',
+            },
+            {
+              name: 'fake-indexeddb',
+              message: 'Only src/stores/ may use IndexedDB.',
+            },
+          ],
+        },
+      ],
+      'no-restricted-globals': [
+        'error',
+        {
+          name: 'indexedDB',
+          message: 'Only src/stores/ may touch IndexedDB.',
+        },
+      ],
+    },
+  },
 )
