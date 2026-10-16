@@ -11,7 +11,7 @@
       "hook": "A nervous visitor meets a self-possessed niece, who has a very particular explanation for the open window.",
       "blurb": "Framton Nuttel, sent to the country to calm his nerves, pays a polite call armed with a letter of introduction. While he waits for his hostess, her fifteen-year-old niece keeps him company, and tells him why the French window stands open. A sharp, brief comedy of manners about who really controls a conversation.",
       "generatedBy": "claude-code",
-      "reviewed": false
+      "reviewed": true
     },
     "pg-375-an-occurrence-at-owl-creek-bridge": {
       "year": 1890,
@@ -23,7 +23,7 @@
       "hook": "In wartime Alabama, a planter stands on a bridge with a rope around his neck.",
       "blurb": "In the American Civil War, a civilian is about to be hanged from a railroad bridge while a company of soldiers stands at attention. The story moves between that scene and the life that brought him there, in precise, unhurried prose. A classic of the short form, remembered for how it handles time and what a mind does under pressure.",
       "generatedBy": "claude-code",
-      "reviewed": false
+      "reviewed": true
     },
     "pg-396-the-lady-or-the-tiger": {
       "year": 1882,
@@ -35,7 +35,7 @@
       "hook": "A semi-barbaric king settles guilt with two doors, a tiger behind one and a bride behind the other.",
       "blurb": "In a faraway kingdom, a king with peculiar ideas of justice stages public trials in an arena. The accused must choose between two identical doors: one hides a hungry tiger, the other a bride. When the king's own daughter loves the wrong man, the old system faces its hardest case. A famous short story about love, jealousy and chance.",
       "generatedBy": "claude-code",
-      "reviewed": false
+      "reviewed": true
     },
     "pg-1063-the-cask-of-amontillado": {
       "year": 1846,
@@ -47,7 +47,7 @@
       "hook": "At carnival time, a man with a grudge invites a wine-lover down into his family catacombs.",
       "blurb": "Montresor has endured a thousand insults from Fortunato and has sworn revenge, carefully and without risk. On the night of the carnival he flatters his rival's pride in wine and leads him down into the damp vaults beneath the family palazzo. A short, chilling monologue of courtesy and cold intent, told by the avenger himself.",
       "generatedBy": "claude-code",
-      "reviewed": false
+      "reviewed": true
     },
     "pg-1064-the-masque-of-the-red-death": {
       "year": 1842,
@@ -59,7 +59,7 @@
       "hook": "A prince seals himself and his friends inside an abbey to escape a plague, and throws a masked ball.",
       "blurb": "A deadly plague has half emptied Prince Prospero's lands, so he withdraws to a fortified abbey with a thousand companions and shuts the world out. Months later he hosts a lavish masquerade in a suite of seven coloured rooms, where an ebony clock chimes the hours and the revellers try not to think about what waits beyond the walls.",
       "generatedBy": "claude-code",
-      "reviewed": false
+      "reviewed": true
     },
     "pg-2148-the-tell-tale-heart": {
       "year": 1843,
@@ -71,7 +71,7 @@
       "hook": "A nervous narrator insists he is perfectly sane while he describes, calmly, what he did to an old man.",
       "blurb": "He loved the old man, he says; it was only the eye, pale blue and filmed over like a vulture's. The narrator insists he is not mad, only sharper in his senses than anyone, and sets out to prove it by calmly telling how he went about his plan. A short, feverish monologue that grows louder as it goes.",
       "generatedBy": "claude-code",
-      "reviewed": false
+      "reviewed": true
     },
     "pg-7256-the-gift-of-the-magi": {
       "year": 1905,
@@ -83,7 +83,7 @@
       "hook": "On Christmas Eve, a poor young wife has $1.87 and one idea for the perfect gift.",
       "blurb": "Della and Jim are young, poor and devoted, with exactly two treasures between them. With one day left before Christmas and almost no money, Della sets out to find Jim the perfect present, whatever it costs her. A warm, wry, much-loved tale of love and sacrifice, told in a teasing storyteller's voice.",
       "generatedBy": "claude-code",
-      "reviewed": false
+      "reviewed": true
     },
     "pg-2814-araby": {
       "year": 1914,
@@ -95,7 +95,7 @@
       "hook": "A Dublin schoolboy, in love from a distance, promises to bring a girl something from the bazaar.",
       "blurb": "On a blind street in Dublin, a boy spends his mornings watching a neighbour's door for a glimpse of his friend's sister. When she mentions a grand bazaar called Araby, he makes her a promise and counts the slow days until Saturday. A quiet, exact story of first love and the gap between imagination and the real world.",
       "generatedBy": "claude-code",
-      "reviewed": false
+      "reviewed": true
     },
     "pg-2776-the-cop-and-the-anthem": {
       "year": 1904,
@@ -107,7 +107,7 @@
       "hook": "A New York vagrant tries everything he can think of to get himself arrested before winter arrives.",
       "blurb": "Soapy, who sleeps on a park bench in Madison Square, has an annual plan for the cold months: get himself sent to jail for a winter of free board. This year, though, the police stubbornly refuse to cooperate. A gently comic tale of schemes that go wrong, with a streak of sympathy for New York's down-and-out.",
       "generatedBy": "claude-code",
-      "reviewed": false
+      "reviewed": true
     },
     "pg-1080-a-modest-proposal": {
       "year": 1729,
@@ -119,7 +119,7 @@
       "hook": "A calm, reasonable-sounding pamphlet offers a solution to Irish poverty that no reader will forget.",
       "blurb": "In 1729 Jonathan Swift wrote as a sober economist, deploying figures and projections on the plight of Ireland's poor. His narrator lays out a scheme in cool, practical language, anticipating objections and listing its advantages one by one. One of the sharpest satires in English, it still unsettles readers; be prepared for disturbing subject matter.",
       "generatedBy": "claude-code",
-      "reviewed": false
+      "reviewed": true
     },
     "pg-12122-the-monkeys-paw": {
       "year": 1902,
@@ -131,7 +131,7 @@
       "hook": "A retired soldier leaves a shrivelled paw with a family, promising three wishes and a warning.",
       "blurb": "On a wet, windy night, the Whites welcome an old friend home from India. He carries a talisman: a dried paw said to grant three wishes to each of three owners, at a price. The family laughs it off, until the first wish is spoken. A classic of the macabre, built on a small family's ordinary hopes.",
       "generatedBy": "claude-code",
-      "reviewed": false
+      "reviewed": true
     },
     "pg-1289-the-signal-man": {
       "year": 1866,
@@ -143,7 +143,7 @@
       "hook": "A traveller calls down to a lonely railway signalman and sees a strange look cross the man's face.",
       "blurb": "Deep in a damp railway cutting, a signalman keeps watch beside the mouth of a tunnel. When a visitor hails him from above, the man reacts as if he has heard that very call before. Over two nights of conversation he confides what has been troubling him. A masterly Victorian ghost story, quietly told, from Dickens's Christmas writing.",
       "generatedBy": "claude-code",
-      "reviewed": false
+      "reviewed": true
     },
     "pg-1952-the-yellow-wallpaper": {
       "year": 1892,
@@ -155,7 +155,7 @@
       "hook": "A woman is ordered to rest in a rented country house, and begins to study the wallpaper.",
       "blurb": "Her husband is a physician, and he has prescribed rest, fresh air and no work whatever. So the narrator keeps a secret journal in the big upstairs room of their rented summer house, noticing everything: the barred windows, the old garden, and above all the strange wallpaper. A landmark of early feminist fiction, told in short, intimate entries.",
       "generatedBy": "claude-code",
-      "reviewed": false
+      "reviewed": true
     },
     "pg-3172-fenimore-coopers-literary-offences": {
       "year": 1895,
@@ -167,7 +167,7 @@
       "hook": "Mark Twain takes a comic, merciless look at James Fenimore Cooper's frontier novels, rule by rule.",
       "blurb": "Three eminent critics had praised Cooper's novels as works of art. Mark Twain, who had read them, disagrees. He sets out rules for good storytelling and measures Deerslayer and The Pathfinder against them, with a sharp eye for broken twigs, impossible boats and impossible rifle shots. A gleeful literary demolition, funny and pointed. Includes period stereotypes.",
       "generatedBy": "claude-code",
-      "reviewed": false
+      "reviewed": true
     },
     "pg-512-the-birthmark": {
       "year": 1843,
@@ -179,7 +179,7 @@
       "hook": "A brilliant scientist marries a beautiful woman and cannot stop looking at one small mark on her cheek.",
       "blurb": "Aylmer is a man of science, newly married to Georgiana, whose beauty is flawless except for a small crimson mark on her cheek. He cannot stop noticing it, and she begins to dread his gaze. When he offers to remove it, they withdraw to his laboratory, where his experiments grow stranger. A haunting parable of perfection, ambition and love.",
       "generatedBy": "claude-code",
-      "reviewed": false
+      "reviewed": true
     },
     "pg-13415-the-lady-with-the-dog": {
       "year": 1899,
@@ -191,7 +191,7 @@
       "hook": "At a seaside resort, a married man notices a woman who is always seen with a small white dog.",
       "blurb": "Dmitri Gurov, a Moscow banker, is spending a fortnight in Yalta when he notices a young woman walking alone with her dog. What begins as a light holiday flirtation follows both of them home, to different towns and different marriages. A quiet, observant story about secrecy, middle age and a love that arrives later than expected.",
       "generatedBy": "claude-code",
-      "reviewed": false
+      "reviewed": true
     },
     "pg-932-the-fall-of-the-house-of-usher": {
       "year": 1839,
@@ -203,7 +203,7 @@
       "hook": "Summoned by a troubled friend, a visitor arrives at a decaying mansion by a black, still lake.",
       "blurb": "A letter begs the narrator to visit his boyhood friend Roderick Usher, who is ill in body and mind. He finds the ancient family house crumbling and gloomy, with Roderick and his ailing sister living in strange seclusion. The friends pass the days with painting, music and old books, but the house seems to press in. Poe's Gothic masterpiece.",
       "generatedBy": "claude-code",
-      "reviewed": false
+      "reviewed": true
     },
     "pg-2148-the-purloined-letter": {
       "year": 1844,
@@ -215,7 +215,7 @@
       "hook": "A police prefect has searched a minister's house for a stolen letter; Dupin has a different approach.",
       "blurb": "One gusty evening in Paris, the Prefect of Police brings the amateur detective C. Auguste Dupin a delicate problem: a letter has been stolen, the thief is known, and months of meticulous searching have found nothing. Dupin listens, smokes his pipe, and considers how people hide things and how others look for them. A detective classic built on conversation.",
       "generatedBy": "claude-code",
-      "reviewed": false
+      "reviewed": true
     },
     "pg-1661-a-scandal-in-bohemia": {
       "year": 1891,
@@ -227,7 +227,7 @@
       "hook": "A masked client asks Sherlock Holmes to retrieve a compromising photograph before a royal wedding is announced.",
       "blurb": "Dr. Watson, now married, calls on his old friend Sherlock Holmes and finds him waiting for a mysterious visitor. The masked caller claims to be a count, but his business is a royal embarrassment that could unravel a coming wedding. With three days to act, Holmes turns to disguises and stratagems. The story that introduced Irene Adler.",
       "generatedBy": "claude-code",
-      "reviewed": false
+      "reviewed": true
     },
     "pg-1661-the-red-headed-league": {
       "year": 1891,
@@ -239,7 +239,7 @@
       "hook": "A pawnbroker with brilliant red hair is offered easy money to copy an encyclopedia. Holmes smells something odd.",
       "blurb": "Jabez Wilson, a London pawnbroker with a fiery head of hair, tells Sherlock Holmes how he landed a very well-paid job for which only red-haired men may apply. The work is oddly light and the rules oddly strict, and then one morning the whole arrangement vanishes. Holmes and Watson set out to find the explanation. A comic, ingenious case.",
       "generatedBy": "claude-code",
-      "reviewed": false
+      "reviewed": true
     },
     "pg-71-on-the-duty-of-civil-disobedience": {
       "year": 1849,
@@ -251,7 +251,7 @@
       "hook": "Why a just person might refuse to pay taxes to a government that supports slavery and war.",
       "blurb": "In 1849 Henry David Thoreau explains why he refused to pay his poll tax to a state that supported slavery and the Mexican War. He argues that conscience should outrank majority rule, that voting alone is not enough, and that under unjust government a just person belongs in prison. He also recounts his night in jail. A deeply influential essay.",
       "generatedBy": "claude-code",
-      "reviewed": false
+      "reviewed": true
     },
     "pg-2944-compensation": {
       "year": 1841,
@@ -263,7 +263,7 @@
       "hook": "Emerson argues that every gain has its cost and every loss its hidden gift.",
       "blurb": "Emerson begins with a sermon he found unconvincing and sets out his own view of justice: in nature and in human life, every excess brings a defect and every advantage a price. He traces this balance through animals, politics, proverbs, work and friendship, and finds in it an argument for honesty. A calm, searching essay on loss, gain and character.",
       "generatedBy": "claude-code",
-      "reviewed": false
+      "reviewed": true
     },
     "pg-16643-self-reliance": {
       "year": 1841,
@@ -275,7 +275,7 @@
       "hook": "A famous call to trust your own mind, resist conformity and be misunderstood.",
       "blurb": "Emerson urges readers to trust their own thoughts over borrowed opinions, tradition and the approval of the crowd. Moving from childhood to society, religion, travel and property, he argues that a person's character, not their possessions or their followers, is the only lasting source of strength. An energetic, quotable essay and a foundation of American individualism.",
       "generatedBy": "claude-code",
-      "reviewed": false
+      "reviewed": true
     },
     "pg-512-rappaccinis-daughter": {
       "year": 1844,
@@ -287,7 +287,7 @@
       "hook": "A student in Padua falls for a physician's daughter, who tends a garden of strange, beautiful plants.",
       "blurb": "Giovanni Guasconti arrives in Padua to study and takes a room overlooking a walled garden, where a pale scientist works among strange, vivid plants. The scientist's daughter, Beatrice, is as radiant as her flowers. As Giovanni is drawn closer, a rival professor warns him that all is not what it seems. A feverish tale of love, science and suspicion.",
       "generatedBy": "claude-code",
-      "reviewed": false
+      "reviewed": true
     },
     "pg-14522-the-canterville-ghost": {
       "year": 1887,
@@ -299,7 +299,7 @@
       "hook": "A wealthy American family buys an English country house, ghost included, and refuses to be frightened.",
       "blurb": "When the practical Otis family buys Canterville Chase, they brush aside every warning that it is haunted by a murderous ghost. Armed with stain remover, bottles of lubricating oil and two mischievous twins, they treat the centuries-old spirit as a household nuisance. A comic reversal of the traditional ghost story, by Oscar Wilde.",
       "generatedBy": "claude-code",
-      "reviewed": false
+      "reviewed": true
     },
     "pg-36238-the-mantle": {
       "year": 1842,
@@ -311,7 +311,7 @@
       "hook": "A humble copying clerk in St Petersburg scrimps and saves for one thing: a warm new winter coat.",
       "blurb": "Akaki Akakievitch is a minor government clerk whose whole life is copying documents. When the St Petersburg winter exposes the ruin of his old cloak, he lives on almost nothing to afford a new one, and for a short while he is almost happy. Gogol's gentle, satirical and eventually haunting story of an overlooked man and the officials around him.",
       "generatedBy": "claude-code",
-      "reviewed": false
+      "reviewed": true
     },
     "pg-2814-the-dead": {
       "year": 1914,
@@ -323,7 +323,7 @@
       "hook": "A Dublin Christmas party, a nervous after-dinner speech, and one old song that stirs unexpected memories.",
       "blurb": "Every year the Misses Morkan hold a festive dance on Usher's Island. This year their nephew Gabriel, a writer and teacher, is nervous about his after-dinner speech and stung by a sharp exchange with a fellow guest. The evening moves through music, supper and farewells, then follows Gabriel and his wife to a hotel room. A masterpiece of quiet observation.",
       "generatedBy": "claude-code",
-      "reviewed": false
+      "reviewed": true
     },
     "pg-35-the-time-machine": {
       "year": 1895,
@@ -335,7 +335,7 @@
       "hook": "A Victorian inventor builds a machine that travels through time and returns with an astonishing tale.",
       "blurb": "At a dinner in suburban London, a host explains the fourth dimension and shows his guests a small working model. A week later he staggers in, dishevelled and exhausted, ready to tell what happened when he tried the full-sized machine. His account reaches a distant future of surprising beauty and hidden dread. A classic of early science fiction.",
       "generatedBy": "claude-code",
-      "reviewed": false
+      "reviewed": true
     }
   }
 }
