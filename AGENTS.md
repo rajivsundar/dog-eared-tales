@@ -26,6 +26,7 @@
 ## Reference and hosting
 
 - `docs/SRS.md` is the product reference. Ignore its parts about agents, Antigravity, Gitea and gates; we build step by step with one assistant, host code on GitHub and deploy to Cloudflare Workers static assets.
+- docs/DECISIONS.md overrides docs/SRS.md wherever they conflict.
 
 ## Secrets
 
