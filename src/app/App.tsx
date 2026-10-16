@@ -1,5 +1,7 @@
-import { Suspense, lazy } from 'react'
-import { Link, Route, Routes } from 'react-router'
+import { Suspense, lazy, useEffect } from 'react'
+import { Link, Route, Routes, useLocation } from 'react-router'
+import { settingsStore } from '../stores'
+import AllStoriesPage from './AllStoriesPage'
 import HomePage from './HomePage'
 
 // The reader (and the book engine behind it) loads only when someone opens a story.
@@ -18,11 +20,26 @@ function NotFound() {
   )
 }
 
+/** Puts the reader's saved theme on the page, so the home page uses the same colours as the reader. */
+function useSavedTheme(): void {
+  const { pathname } = useLocation()
+  useEffect(() => {
+    settingsStore
+      .get()
+      .then((s) => {
+        document.documentElement.dataset.theme = s.theme
+      })
+      .catch(() => {})
+  }, [pathname])
+}
+
 export default function App() {
+  useSavedTheme()
   return (
     <Suspense fallback={<p className="p-6 text-center">Loading…</p>}>
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/all" element={<AllStoriesPage />} />
         <Route path="/read/:id" element={<ReaderScreen />} />
         <Route path="*" element={<NotFound />} />
       </Routes>

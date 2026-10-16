@@ -77,10 +77,10 @@ function readStore(
 
 // ---------------------------------------------------------------- tests
 
-test('the home page lists all 28 stories and each one opens in the reader', async ({
+test('the full list at /all has all 28 stories and each one opens in the reader', async ({
   page,
 }) => {
-  await page.goto('/')
+  await page.goto('/all')
   const links = page.getByRole('link', { name: /min$/ })
   await expect(links).toHaveCount(28)
   await page.getByRole('link', { name: /The Cask of Amontillado/ }).click()

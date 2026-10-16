@@ -4,6 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetCatalogCache } from '../catalog'
 import App from './App'
 
+// The app reads its theme from the settings store; the tests use a stand-in.
+vi.mock('../stores', async () => {
+  const { fakeStores } = await import('../features/shortlist/fakeStores')
+  return fakeStores()
+})
+
 const entries = [
   {
     id: 'pg-1063-the-cask-of-amontillado',
@@ -36,13 +42,19 @@ beforeEach(() => {
 })
 afterEach(() => vi.unstubAllGlobals())
 
+function renderAt(path: string) {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <App />
+    </MemoryRouter>,
+  )
+}
+
 describe('App', () => {
-  it('shows the name and tagline', async () => {
-    render(
-      <MemoryRouter>
-        <App />
-      </MemoryRouter>,
-    )
+  it('shows the name and tagline on the home page', async () => {
+    // These two stand-in stories are too bare for the recommender; that is not what this test checks.
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    renderAt('/')
     expect(
       screen.getByRole('heading', { name: 'Twice Told' }),
     ).toBeInTheDocument()
@@ -51,15 +63,12 @@ describe('App', () => {
         'Great free stories, picked for you. Start short. Fall for the classics.',
       ),
     ).toBeInTheDocument()
-    await screen.findByText('A Scandal in Bohemia')
+    await screen.findByRole('heading', { name: /Shortlist/ })
+    error.mockRestore()
   })
 
-  it('lists every catalog entry as a link to its reader', async () => {
-    render(
-      <MemoryRouter>
-        <App />
-      </MemoryRouter>,
-    )
+  it('lists every catalog entry at /all as a link to its reader', async () => {
+    renderAt('/all')
     const link = await screen.findByRole('link', {
       name: /A Scandal in Bohemia/,
     })
@@ -70,18 +79,14 @@ describe('App', () => {
     ).toBeInTheDocument()
   })
 
-  it('says so when the catalog cannot be loaded', async () => {
+  it('says so when the catalog cannot be loaded at /all', async () => {
     resetCatalogCache()
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => ({ ok: false, status: 404, json: async () => ({}) })),
     )
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
-    render(
-      <MemoryRouter>
-        <App />
-      </MemoryRouter>,
-    )
+    renderAt('/all')
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'We couldn’t load the stories.',
     )
@@ -89,11 +94,7 @@ describe('App', () => {
   })
 
   it('shows a friendly page for an unknown address', () => {
-    render(
-      <MemoryRouter initialEntries={['/nowhere']}>
-        <App />
-      </MemoryRouter>,
-    )
+    renderAt('/nowhere')
     expect(
       screen.getByRole('heading', { name: 'Page not found' }),
     ).toBeInTheDocument()

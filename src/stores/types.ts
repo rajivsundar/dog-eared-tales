@@ -25,6 +25,9 @@ export type ReaderEventType =
   | 'notForMe'
   | 'open'
   | 'progress'
+  | 'shown'
+  | 'tap'
+  | 'undo'
   | 'finished'
   | 'stopped'
   | 'abandoned'
@@ -81,6 +84,13 @@ export type ThemeChoice = (typeof THEMES)[number]
 export const MIN_TEXT_SIZE = 1
 export const MAX_TEXT_SIZE = 10
 
+/** Today's Shortlist, kept so every load on the same local day shows the same picks. */
+export interface DailyShortlist {
+  /** Local date, "YYYY-MM-DD". */
+  date: string
+  picks: Array<{ workId: string; reason: string }>
+}
+
 export interface Settings {
   id: string
   theme: ThemeChoice
@@ -90,6 +100,7 @@ export interface Settings {
   mix: string
   aiPrefs: Record<string, unknown>
   contentFilters: Record<string, unknown>
+  shortlist?: DailyShortlist
 }
 
 export interface ProfileStore {
