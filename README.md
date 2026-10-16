@@ -79,7 +79,7 @@ src/
 
 Every push to `main` runs the checks and deploys to Cloudflare Workers via GitHub Actions, using the repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
 
-Live site: <add your workers.dev address after Phase 8>
+Live site: <https://twice-told.rajivsundar.workers.dev>
 
 ## For contributors and AI assistants
 
@@ -89,4 +89,4 @@ Live site: <add your workers.dev address after Phase 8>
 
 ## License
 
-Code: <choose a license, or "All rights reserved">. Book texts: see Content and licenses.
+Code: All rights reserved. Book texts: see Content and licenses.
