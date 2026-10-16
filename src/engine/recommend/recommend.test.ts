@@ -185,6 +185,18 @@ describe('exclusions', () => {
     expect(ids).not.toContain('d-cozy')
   })
 
+  it('lets an undo cancel not-for-me, but not an undo of an un-dog-ear', () => {
+    const hidden = [event('a-eerie', 'notForMe')]
+    const ids = (events: ReaderEvent[]) =>
+      recommend({ catalog, profile: eerieFan, events }).picks.map(
+        (p) => p.entry.id,
+      )
+    expect(ids(hidden)).not.toContain('a-eerie')
+    expect(ids([...hidden, event('a-eerie', 'undo')])).toContain('a-eerie')
+    const unsave = { ...event('a-eerie', 'undo'), reason: 'unsave' }
+    expect(ids([...hidden, unsave])).not.toContain('a-eerie')
+  })
+
   it('still offers a story the reader opened but did not finish', () => {
     const events = [event('a-eerie', 'open')]
     const ids = recommend({ catalog, profile: eerieFan, events }).picks.map(

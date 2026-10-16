@@ -35,8 +35,8 @@ export function digestEvents(events: ReaderEvent[]): History {
       history.finished.add(id)
     } else if (event.type === 'notForMe') {
       history.notForMe.add(id)
-    } else if (event.type === 'undo') {
-      // Undo cancels the not-for-me before it.
+    } else if (event.type === 'undo' && event.reason !== 'unsave') {
+      // Undo cancels the not-for-me before it. (An undo of an un-dog-ear says reason: 'unsave'.)
       history.notForMe.delete(id)
     }
   }

@@ -3,6 +3,8 @@ import type {
   EventLog,
   LibraryStore,
   ProfileStore,
+  Progress,
+  ProgressStore,
   ReaderEvent,
   SavedWork,
   Settings,
@@ -21,6 +23,7 @@ export function fakeStores() {
   }
   const events: ReaderEvent[] = []
   const library = new Map<string, SavedWork>()
+  const progress = new Map<string, Progress>()
   let counter = 0
 
   const settingsStore: SettingsStore = {
@@ -50,13 +53,14 @@ export function fakeStores() {
   }
   const libraryStore: LibraryStore = {
     get: async (id) => library.get(id),
-    list: async () => [...library.values()],
-    save: async (workId) => {
+    list: async () =>
+      [...library.values()].sort((a, b) => b.addedAt - a.addedAt),
+    save: async (workId, options = {}) => {
       const item = {
         workId,
-        shelf: 'default',
-        addedAt: Date.now(),
-        offline: false,
+        shelf: options.shelf ?? 'default',
+        addedAt: library.get(workId)?.addedAt ?? options.addedAt ?? Date.now(),
+        offline: options.offline ?? false,
       }
       library.set(workId, item)
       return item
@@ -65,13 +69,28 @@ export function fakeStores() {
       library.delete(id)
     },
   }
+  const progressStore: ProgressStore = {
+    get: async (id) => progress.get(id),
+    set: async (p) => {
+      const saved = { ...p, updatedAt: Date.now() }
+      progress.set(p.workId, saved)
+      return saved
+    },
+    list: async () =>
+      [...progress.values()].sort((a, b) => b.updatedAt - a.updatedAt),
+    remove: async (id) => {
+      progress.delete(id)
+    },
+  }
   return {
+    progressStore,
     settingsStore,
     eventLog,
     profileStore,
     libraryStore,
     events,
     library,
+    progress,
   }
 }
 

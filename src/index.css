@@ -16,6 +16,7 @@
   --accent: #8a3b12;
   --accent-ink: #ffffff;
   --scrim: rgb(28 26 23 / 0.5);
+  --nav-height: 4rem;
 }
 :root[data-theme='sepia'] {
   color-scheme: light;

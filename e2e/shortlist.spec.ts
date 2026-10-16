@@ -72,5 +72,5 @@ test('Not for me swaps the card and Undo brings it back', async ({ page }) => {
 
 test('the full list stays at /all', async ({ page }) => {
   await page.goto('/all')
-  await expect(page.getByRole('link')).toHaveCount(28)
+  await expect(page.getByRole('main').getByRole('link')).toHaveCount(28)
 })

@@ -1,0 +1,201 @@
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { MemoryRouter } from 'react-router'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { resetCatalogCache } from '../../catalog'
+import { fakeCatalog, fakeStores } from '../shortlist/fakeStores'
+import LibraryScreen from './LibraryScreen'
+
+const h = vi.hoisted(() => ({
+  current: null as unknown as ReturnType<
+    typeof import('../shortlist/fakeStores').fakeStores
+  >,
+}))
+vi.mock('../../stores', () => {
+  const delegate = (name: string) =>
+    new Proxy(
+      {},
+      {
+        get:
+          (_, method: string) =>
+          (...args: unknown[]) =>
+            (
+              h.current as unknown as Record<
+                string,
+                Record<string, (...a: unknown[]) => unknown>
+              >
+            )[name][method](...args),
+      },
+    )
+  return {
+    eventLog: delegate('eventLog'),
+    libraryStore: delegate('libraryStore'),
+    progressStore: delegate('progressStore'),
+  }
+})
+
+let stores: ReturnType<typeof fakeStores>
+
+function renderLibrary(path = '/library') {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <LibraryScreen />
+    </MemoryRouter>,
+  )
+}
+
+const tab = (name: string) =>
+  screen.getByRole('tab', { name: new RegExp(name) })
+
+beforeEach(() => {
+  stores = fakeStores()
+  h.current = stores
+  resetCatalogCache()
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        schemaVersion: 1,
+        entries: fakeCatalog().map((e) => ({ ...e, wordCount: 2380 })),
+      }),
+    })),
+  )
+  vi.useFakeTimers({ shouldAdvanceTime: true })
+})
+afterEach(() => {
+  vi.useRealTimers()
+  vi.unstubAllGlobals()
+})
+
+describe('empty states', () => {
+  it.each([
+    ['reading', /Nothing in progress yet/],
+    ['dog-eared', /Nothing dog-eared yet/],
+    ['finished', /No finished stories yet/],
+  ])('the %s tab says so and links to Your Shortlist', async (id, text) => {
+    renderLibrary(`/library?tab=${id}`)
+    expect(await screen.findByText(text)).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: 'Go to Your Shortlist' }),
+    ).toHaveAttribute('href', '/')
+  })
+})
+
+describe('tabs', () => {
+  it('starts on Reading and shows a story with a progress bar and minutes left', async () => {
+    await stores.progressStore.set({
+      workId: 'story-3',
+      locator: 'x',
+      percent: 50,
+      secondsRead: 10,
+    })
+    renderLibrary()
+    expect(await screen.findByText('Story 3')).toBeInTheDocument()
+    expect(tab('Reading')).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByText('5 min left')).toBeInTheDocument()
+    expect(screen.getByRole('progressbar')).toHaveAttribute(
+      'aria-valuenow',
+      '50',
+    )
+    expect(screen.getByRole('link', { name: /Story 3/ })).toHaveAttribute(
+      'href',
+      '/read/story-3',
+    )
+  })
+
+  it('switches tabs and with the arrow keys', async () => {
+    await stores.libraryStore.save('story-4')
+    renderLibrary()
+    await screen.findByText(/Nothing in progress yet/)
+    fireEvent.keyDown(tab('Reading'), { key: 'ArrowRight' })
+    expect(await screen.findByText('Story 4')).toBeInTheDocument()
+    expect(tab('Dog-eared')).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('shows the finish date on Finished', async () => {
+    await stores.eventLog.append({
+      workId: 'story-2',
+      type: 'finished',
+      at: new Date(2026, 9, 14, 12).getTime(),
+    })
+    renderLibrary('/library?tab=finished')
+    expect(await screen.findByText('Story 2')).toBeInTheDocument()
+    expect(screen.getByText(/Finished .*2026/)).toBeInTheDocument()
+  })
+
+  it('keeps an opened but unread work under Dog-eared', async () => {
+    await stores.libraryStore.save('story-1')
+    await stores.eventLog.append({ workId: 'story-1', type: 'open' })
+    renderLibrary()
+    await screen.findByText(/Nothing in progress yet/)
+    fireEvent.click(tab('Dog-eared'))
+    expect(await screen.findByText('Story 1')).toBeInTheDocument()
+  })
+
+  it('moves a dog-eared work to Reading after a page is turned', async () => {
+    await stores.libraryStore.save('story-1')
+    await stores.progressStore.set({
+      workId: 'story-1',
+      locator: 'x',
+      percent: 12,
+      secondsRead: 30,
+    })
+    renderLibrary()
+    expect(await screen.findByText('Story 1')).toBeInTheDocument()
+    fireEvent.click(tab('Dog-eared'))
+    expect(await screen.findByText(/Nothing dog-eared yet/)).toBeInTheDocument()
+  })
+})
+
+describe('un-dog-ear', () => {
+  async function setup() {
+    await stores.libraryStore.save('story-1', { addedAt: 1000 })
+    await stores.libraryStore.save('story-2', { addedAt: 2000 })
+    renderLibrary('/library?tab=dog-eared')
+    await screen.findByText('Story 2')
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Un-dog-ear Story 2' }),
+      )
+    })
+  }
+
+  it('removes the card, records unsave and shows Removed · Undo', async () => {
+    await setup()
+    expect(screen.queryByText('Story 2')).not.toBeInTheDocument()
+    expect(screen.getByText('Story 1')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Removed ·')
+    expect(stores.events.filter((e) => e.type === 'unsave')).toEqual([
+      expect.objectContaining({ workId: 'story-2' }),
+    ])
+    expect(stores.library.has('story-2')).toBe(false)
+  })
+
+  it('Undo puts the work back with its date and records an undo of the unsave', async () => {
+    await setup()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    })
+    expect(await screen.findByText('Story 2')).toBeInTheDocument()
+    expect(stores.library.get('story-2')?.addedAt).toBe(2000)
+    expect(stores.events.filter((e) => e.type === 'undo')).toEqual([
+      expect.objectContaining({ workId: 'story-2', reason: 'unsave' }),
+    ])
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    // Newest first, as before.
+    const titles = within(screen.getByRole('tabpanel'))
+      .getAllByRole('link')
+      .map((l) => l.textContent)
+    expect(titles[0]).toContain('Story 2')
+  })
+
+  it('the message goes away after 5 seconds', async () => {
+    await setup()
+    act(() => {
+      vi.advanceTimersByTime(5000)
+    })
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(stores.library.has('story-2')).toBe(false)
+  })
+})

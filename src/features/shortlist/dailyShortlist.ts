@@ -151,6 +151,6 @@ export async function undoRemove(
   workId: string,
   now: Date,
 ): Promise<void> {
-  await deps.events.append({ workId, type: 'undo' })
+  await deps.events.append({ workId, type: 'undo', reason: 'notForMe' })
   await save(deps, previous, now)
 }

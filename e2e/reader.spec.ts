@@ -1,4 +1,5 @@
 import { type Page, expect, test } from '@playwright/test'
+import { turnForward } from './helpers'
 
 // ---------------------------------------------------------------- helpers
 
@@ -32,18 +33,6 @@ function sectionText(page: Page): Promise<string> {
       .replace(/\s+/g, ' ')
       .trim()
   })
-}
-
-async function turnForward(page: Page): Promise<void> {
-  const reader = page.getByTestId('reader')
-  const before = (await reader.getAttribute('data-locator')) ?? ''
-  // A key pressed while the previous page is still settling is ignored, so press again if needed.
-  for (let attempt = 0; attempt < 12; attempt++) {
-    await page.keyboard.press('ArrowRight')
-    await page.waitForTimeout(250)
-    if ((await reader.getAttribute('data-locator')) !== before) return
-  }
-  throw new Error('the page did not turn')
 }
 
 /** Reads every record in one of the app's IndexedDB stores. */

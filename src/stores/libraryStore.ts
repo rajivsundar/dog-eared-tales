@@ -11,7 +11,7 @@ export function createLibraryStore(db: TwiceToldDB): LibraryStore {
         workId,
         shelf: options.shelf ?? existing?.shelf ?? 'default',
         offline: options.offline ?? existing?.offline ?? false,
-        addedAt: existing?.addedAt ?? Date.now(),
+        addedAt: existing?.addedAt ?? options.addedAt ?? Date.now(),
       }
       await db.library.put(item)
       return item

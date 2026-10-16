@@ -124,7 +124,7 @@ export interface LibraryStore {
   list(): Promise<SavedWork[]>
   save(
     workId: string,
-    options?: { shelf?: string; offline?: boolean },
+    options?: { shelf?: string; offline?: boolean; addedAt?: number },
   ): Promise<SavedWork>
   remove(workId: string): Promise<void>
 }

@@ -6,6 +6,7 @@ import {
   profileStore,
   settingsStore,
 } from '../../stores'
+import { UndoToast } from '../ui/UndoToast'
 import { DetailSheet } from '../detail/DetailSheet'
 import { minutesLabel } from '../detail/labels'
 import {
@@ -20,9 +21,8 @@ import {
   undoRemove,
 } from './dailyShortlist'
 
-const TOAST_MS = 5000
-
 interface Removed {
+  key: number
   workId: string
   previous: ShortlistPick[]
 }
@@ -68,13 +68,6 @@ export function ShortlistScreen() {
     }
   }, [now])
 
-  // The "Removed · Undo" message goes away after 5 seconds.
-  useEffect(() => {
-    if (!removed) return
-    const timer = setTimeout(() => setRemoved(null), TOAST_MS)
-    return () => clearTimeout(timer)
-  }, [removed])
-
   const open = picks?.find((p) => p.entry.id === openId)
 
   const fail = (error: unknown): void => {
@@ -99,7 +92,7 @@ export function ShortlistScreen() {
     removePick(catalogDeps, previous, id, new Date())
       .then(async ({ picks: next, replacement }) => {
         setPicks(next)
-        setRemoved({ workId: id, previous })
+        setRemoved({ key: Date.now(), workId: id, previous })
         if (replacement) {
           await recordShown(catalogDeps, [replacement], new Date())
         }
@@ -181,19 +174,11 @@ export function ShortlistScreen() {
       )}
 
       {removed && (
-        <div
-          role="status"
-          className="fixed inset-x-gutter bottom-4 z-30 mx-auto flex max-w-sm items-center justify-between gap-4 rounded-full bg-ink px-5 py-3 text-page shadow-lg"
-        >
-          <span>Removed ·</span>
-          <button
-            type="button"
-            onClick={onUndo}
-            className="min-h-8 font-semibold underline"
-          >
-            Undo
-          </button>
-        </div>
+        <UndoToast
+          key={removed.key}
+          onUndo={onUndo}
+          onExpire={() => setRemoved(null)}
+        />
       )}
     </section>
   )

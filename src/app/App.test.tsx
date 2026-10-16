@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetCatalogCache } from '../catalog'
@@ -73,7 +73,9 @@ describe('App', () => {
       name: /A Scandal in Bohemia/,
     })
     expect(link).toHaveAttribute('href', '/read/pg-1661-a-scandal-in-bohemia')
-    expect(screen.getAllByRole('link')).toHaveLength(entries.length)
+    expect(within(screen.getByRole('main')).getAllByRole('link')).toHaveLength(
+      entries.length,
+    )
     expect(
       screen.getByText(/from The Adventures of Sherlock Holmes/),
     ).toBeInTheDocument()
@@ -89,6 +91,40 @@ describe('App', () => {
     renderAt('/all')
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'We couldn’t load the stories.',
+    )
+    error.mockRestore()
+  })
+
+  it('shows the bottom navigation with the current tab marked', async () => {
+    renderAt('/settings')
+    const nav = screen.getByRole('navigation', { name: 'Main' })
+    expect(
+      within(nav)
+        .getAllByRole('link')
+        .map((l) => l.textContent),
+    ).toEqual(['Shortlist', 'Library', 'Settings'])
+    expect(within(nav).getByRole('link', { name: 'Settings' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    expect(
+      within(nav).getByRole('link', { name: 'Library' }),
+    ).not.toHaveAttribute('aria-current')
+    expect(
+      screen.getByRole('heading', { name: 'Settings' }),
+    ).toBeInTheDocument()
+  })
+
+  it('opens the Library from the navigation', async () => {
+    renderAt('/')
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    fireEvent.click(screen.getByRole('link', { name: 'Library' }))
+    expect(
+      await screen.findByRole('heading', { name: 'Library' }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Library' })).toHaveAttribute(
+      'aria-current',
+      'page',
     )
     error.mockRestore()
   })

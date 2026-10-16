@@ -87,6 +87,14 @@ describe('LibraryStore', () => {
     expect(await lib.get('w1')).toBeUndefined()
   })
 
+  it('can put a work back with its original date added', async () => {
+    const lib = createLibraryStore(db)
+    await lib.save('w1', { addedAt: 1000 })
+    await lib.save('w2')
+    expect((await lib.get('w1'))?.addedAt).toBe(1000)
+    expect((await lib.list()).map((i) => i.workId)).toEqual(['w2', 'w1'])
+  })
+
   it('saving again keeps the original date added', async () => {
     const lib = createLibraryStore(db)
     const first = await lib.save('w1')
