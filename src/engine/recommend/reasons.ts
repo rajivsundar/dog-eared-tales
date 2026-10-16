@@ -1,6 +1,7 @@
 import type { CatalogEntry } from '../../catalog'
 import type { Profile } from '../../stores'
 import { facetWeight } from './score'
+import { genrePlural, moodPlural } from './wording'
 
 type Beliefs = Profile['facetBeliefs']
 
@@ -15,10 +16,6 @@ function withArticle(phrase: string): string {
   return /^[aeiou]/i.test(phrase) ? `an ${phrase}` : `a ${phrase}`
 }
 
-function genrePhrase(genre: string): string {
-  return genre.endsWith('story') ? `${genre.slice(0, -5)}stories` : genre
-}
-
 /** The mood or genre the reader likes best in this entry, if they like any (weight above 0.5). */
 function bestLiked(entry: CatalogEntry, beliefs: Beliefs): string | null {
   let best: { phrase: string; weight: number } | null = null
@@ -27,9 +24,10 @@ function bestLiked(entry: CatalogEntry, beliefs: Beliefs): string | null {
     if (weight > 0.5 && (!best || weight > best.weight))
       best = { phrase, weight }
   }
-  for (const mood of entry.moods) consider(`mood:${mood}`, `${mood} stories`)
+  for (const mood of entry.moods)
+    consider(`mood:${mood}`, moodPlural(mood, entry.form))
   for (const genre of entry.genres)
-    consider(`genre:${genre}`, genrePhrase(genre))
+    consider(`genre:${genre}`, genrePlural(genre, entry.form))
   return (best as { phrase: string } | null)?.phrase ?? null
 }
 

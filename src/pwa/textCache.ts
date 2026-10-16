@@ -33,8 +33,55 @@ export function onTextCacheChange(listener: () => void): () => void {
   }
 }
 
-/** Files being fetched right now, so two overlapping runs never fetch one twice. */
-const inFlight = new Set<string>()
+type Outcome = 'cached' | 'present' | 'failed'
+
+/**
+ * What this session has already done, for one Cache Storage: files stored, and requests still
+ * running. Overlapping runs (such as the shortlist effect running twice) share one request per
+ * file, so each book is fetched at most once per session.
+ */
+interface Session {
+  saved: Set<string>
+  pending: Map<string, Promise<Outcome>>
+}
+const sessions = new WeakMap<object, Session>()
+function sessionFor(cacheStorage: CacheStorage): Session {
+  let session = sessions.get(cacheStorage)
+  if (!session) {
+    session = { saved: new Set(), pending: new Map() }
+    sessions.set(cacheStorage, session)
+  }
+  return session
+}
+
+/** Fetches one file unless it is already stored or already being fetched, and stores it. */
+function fetchOnce(
+  path: string,
+  cache: Cache,
+  fetchFn: typeof fetch,
+  session: Session,
+): Promise<Outcome> {
+  const running = session.pending.get(path)
+  if (running) return running
+  const run = (async (): Promise<Outcome> => {
+    // Look in the texts cache first: a file already there is never fetched again.
+    if (session.saved.has(path) || (await cache.match(path))) {
+      session.saved.add(path)
+      return 'present'
+    }
+    const response = await fetchFn(path)
+    if (response.ok && response.status === 200) {
+      await cache.put(path, response)
+      session.saved.add(path)
+      return 'cached'
+    }
+    return 'failed'
+  })()
+    .catch((): Outcome => 'failed')
+    .finally(() => session.pending.delete(path))
+  session.pending.set(path, run)
+  return run
+}
 
 function pathOf(url: string): string {
   return new URL(url, 'http://localhost').pathname
@@ -85,8 +132,9 @@ export async function autoCacheTexts(
   try {
     const have = await cachedTextPaths(cacheStorage)
     // Several works share one EPUB: each file is fetched once.
+    const session = sessionFor(cacheStorage)
     const wanted = [...new Set(urls.map(pathOf))].filter(
-      (path) => !have.has(path) && !inFlight.has(path),
+      (path) => !have.has(path) && !session.saved.has(path),
     )
     if (wanted.length === 0) return result
 
@@ -101,20 +149,9 @@ export async function autoCacheTexts(
         result.status = 'offline'
         break
       }
-      inFlight.add(path)
-      try {
-        const response = await fetchFn(path)
-        if (response.ok && response.status === 200) {
-          await cache.put(path, response)
-          result.cached.push(path)
-        } else {
-          result.failed.push(path)
-        }
-      } catch {
-        result.failed.push(path)
-      } finally {
-        inFlight.delete(path)
-      }
+      const outcome = await fetchOnce(path, cache, fetchFn, session)
+      if (outcome === 'cached') result.cached.push(path)
+      else if (outcome === 'failed') result.failed.push(path)
     }
   } catch (error) {
     console.debug('could not save books for offline', error)

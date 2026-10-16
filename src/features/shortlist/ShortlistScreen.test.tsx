@@ -6,6 +6,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react'
+import { StrictMode } from 'react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetCatalogCache } from '../../catalog'
@@ -534,6 +535,42 @@ describe('offline books', () => {
         new Set(titles.map(epub)),
       ),
     )
+  })
+
+  it('fetches each file once even when the page builds its lists twice', async () => {
+    const { textFetches } = stubOffline()
+    // StrictMode runs every effect twice, like two quick builds of the shortlist.
+    render(
+      <StrictMode>
+        <MemoryRouter>
+          <HomePage />
+        </MemoryRouter>
+      </StrictMode>,
+    )
+    await screen.findAllByRole('listitem')
+    const expected = screen
+      .getAllByRole('listitem')
+      .map((li) => epub(numberOf(li)))
+    await waitFor(() =>
+      expect(textFetches().length).toBe(new Set(expected).size),
+    )
+    // Give any second round of fetches time to show up, then count.
+    await new Promise((r) => setTimeout(r, 50))
+    expect(textFetches().sort()).toEqual([...new Set(expected)].sort())
+  })
+
+  it('does not fetch a book again when the page is visited a second time', async () => {
+    const { textFetches } = stubOffline()
+    const first = renderHome()
+    await screen.findAllByRole('listitem')
+    await waitFor(() => expect(textFetches().length).toBeGreaterThan(0))
+    await new Promise((r) => setTimeout(r, 50))
+    const once = textFetches().length
+    first.unmount()
+    renderHome()
+    await screen.findAllByRole('listitem')
+    await new Promise((r) => setTimeout(r, 50))
+    expect(textFetches()).toHaveLength(once)
   })
 
   it('also stores Dog-eared works and works under Reading', async () => {

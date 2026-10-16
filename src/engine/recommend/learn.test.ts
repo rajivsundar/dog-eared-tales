@@ -388,7 +388,7 @@ describe('Why this pick?', () => {
 
   it('names the moods and genres the reader likes', () => {
     expect(whyThisPick(eerie, 'Because you like eerie stories', likes)).toBe(
-      'It matches what you like: eerie and horror.',
+      'It matches what you like: eerie stories and horror stories.',
     )
     expect(
       whyThisPick(eerie, 'Because you like eerie stories', {

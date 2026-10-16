@@ -3,6 +3,7 @@ import type { Profile, ReaderEvent } from '../../stores'
 import { digestEvents } from './history'
 import { netWeight, workStates } from './learn'
 import { genreMatch, moodMatch } from './score'
+import { genreSingular, moodPlural, moodSingular } from './wording'
 
 type Beliefs = Profile['facetBeliefs']
 
@@ -86,15 +87,16 @@ export function longListReason(
     const liked = byId.get(id)!
     const genre = liked.genres.find((g) => entry.genres.includes(g))
     const mood = liked.moods.find((m) => entry.moods.includes(m))
-    const facet = genre ?? mood
-    if (!facet) continue
+    if (!genre && !mood) continue
     const verb = state.rating?.type === 'love' ? 'loved' : 'liked'
-    const noun = facet.endsWith('story') ? facet : `${facet} story`
+    const noun = genre
+      ? genreSingular(genre, entry.form)
+      : moodSingular(mood!, entry.form)
     return `You ${verb} ${liked.title} — try a longer ${noun}`
   }
   const mood = entry.moods.find((m) => netWeight(beliefs, `mood:${m}`) > 0)
   return mood
-    ? `Matches your taste for ${mood} stories`
+    ? `Matches your taste for ${moodPlural(mood, entry.form)}`
     : 'A longer read, for when you are ready'
 }
 

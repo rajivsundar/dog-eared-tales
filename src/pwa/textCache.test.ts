@@ -220,6 +220,74 @@ describe('auto-caching book texts', () => {
   })
 })
 
+describe('each book is fetched at most once per session', () => {
+  it('shares one request when two runs start together (the shortlist effect running twice)', async () => {
+    let release: () => void = () => {}
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const { fake, fetchFn, deps } = setup({
+      respond: async () => {
+        await gate
+        return ok()
+      },
+    })
+    const files = ['/texts/pg-1.epub', '/texts/pg-2.epub', '/texts/pg-3.epub']
+    const first = autoCacheTexts(files, deps)
+    const second = autoCacheTexts(files, deps)
+    await new Promise((r) => setTimeout(r, 5))
+    release()
+    await Promise.all([first, second])
+    expect(fetchFn).toHaveBeenCalledTimes(3)
+    expect(fetchFn.mock.calls.map(([u]) => String(u)).sort()).toEqual(files)
+    expect(fake.paths(TEXTS_CACHE).sort()).toEqual(files)
+  })
+
+  it('does not fetch again when a second run starts after the first finished with a stale list', async () => {
+    const { fetchFn, deps } = setup()
+    const files = ['/texts/pg-1.epub', '/texts/pg-2.epub']
+    // The second run reads the cache listing while the first is still working, so its list is stale.
+    const [a, b] = await Promise.all([
+      autoCacheTexts(files, deps),
+      autoCacheTexts(files, deps),
+    ])
+    expect(fetchFn).toHaveBeenCalledTimes(2)
+    expect(a.failed).toEqual([])
+    expect(b.failed).toEqual([])
+    // And a later run finds everything stored.
+    await autoCacheTexts(files, deps)
+    expect(fetchFn).toHaveBeenCalledTimes(2)
+  })
+
+  it('looks in the texts cache before fetching, and skips a file that is there', async () => {
+    const { fetchFn, deps } = setup()
+    // A cache whose listing is behind: keys() says empty, but the file is in there.
+    const storage = {
+      open: async () => ({
+        keys: async () => [],
+        match: async () => new Response('already here'),
+        put: async () => {},
+      }),
+    } as unknown as CacheStorage
+    const result = await autoCacheTexts(['/texts/pg-1.epub'], {
+      ...deps,
+      caches: storage,
+    })
+    expect(fetchFn).not.toHaveBeenCalled()
+    expect(result.cached).toEqual([])
+    expect(result.failed).toEqual([])
+  })
+
+  it('counts a file shared by several works once, across overlapping runs', async () => {
+    const { fetchFn, deps } = setup()
+    await Promise.all([
+      autoCacheTexts(['/texts/pg-1661.epub', '/texts/pg-1661.epub'], deps),
+      autoCacheTexts(['/texts/pg-1661.epub'], deps),
+    ])
+    expect(fetchFn).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('what is stored', () => {
   it('lists the stored books by path', async () => {
     const { fake } = setup({
