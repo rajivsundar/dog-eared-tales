@@ -1,0 +1,97 @@
+name: CI and deploy
+
+# Every pull request runs the checks. A push to main runs the checks, then deploys to Cloudflare.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Nothing in this workflow needs to write to the repository.
+permissions:
+  contents: read
+
+# A new push to the same branch or pull request replaces a run that is still going.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Node 24 (with the npm cache)
+        uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install packages
+        run: npm ci
+
+      - name: Build the catalog
+        run: npm run catalog
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Install the Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Playwright tests
+        run: npm run e2e
+
+      - name: Keep the Playwright report (only when a test fails)
+        if: failure()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  deploy:
+    name: Deploy to Cloudflare
+    # Only after the checks pass, and only for a push to main (never for a pull request).
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # One deploy at a time, and never cancel one that has started.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Node 24 (with the npm cache)
+        uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install packages
+        run: npm ci
+
+      - name: Build the app (this builds the catalog first)
+        run: npm run build
+
+      - name: Deploy with Wrangler
+        uses: cloudflare/wrangler-action@v4.1.3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
