@@ -159,3 +159,17 @@ export async function autoCacheTexts(
   if (result.cached.length > 0) listeners.forEach((listener) => listener())
   return result
 }
+
+/** Deletes every stored book (Delete all my data) and forgets what this session had saved. */
+export async function clearTextCache(
+  cacheStorage: CacheStorage | undefined = globalThis.caches,
+): Promise<void> {
+  if (!cacheStorage) return
+  try {
+    await cacheStorage.delete(TEXTS_CACHE)
+  } catch (error) {
+    console.debug('could not clear the saved books', error)
+  }
+  sessions.delete(cacheStorage)
+  listeners.forEach((listener) => listener())
+}

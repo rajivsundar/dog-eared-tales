@@ -12,6 +12,7 @@ Other code imports from `src/stores` (index.ts) and uses the interfaces in `type
 | `progressStore`  | Reading position for each work.                                    |
 | `highlightStore` | Highlights and notes.                                              |
 | `settingsStore`  | Reading and display preferences.                                   |
+| `dataStore`      | Export, import and delete every store (Settings → Your data).      |
 
 ## Changing the schema later
 

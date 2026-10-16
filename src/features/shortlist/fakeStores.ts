@@ -1,4 +1,6 @@
 // In-memory stand-ins for the stores, for tests only.
+import { BACKUP_SCHEMA_VERSION } from '../../stores/backup'
+import type { BackupFile, DataStore } from '../../stores/backup'
 import type {
   EventLog,
   LibraryStore,
@@ -88,7 +90,42 @@ export function fakeStores() {
       progress.delete(id)
     },
   }
+  const defaults: Settings = { ...settings }
+  /** Export, import and delete over these in-memory stores, like the real DataStore. */
+  const dataStore: DataStore = {
+    exportAll: async (): Promise<BackupFile> => ({
+      app: 'twice-told',
+      schemaVersion: BACKUP_SCHEMA_VERSION,
+      exportedAt: new Date().toISOString(),
+      stores: {
+        profile: profile ? [profile] : [],
+        events: [...events],
+        library: [...library.values()],
+        progress: [...progress.values()],
+        highlights: [],
+        settings: [settings],
+      },
+    }),
+    importAll: async (backup) => {
+      profile = backup.stores.profile[0]
+      events.length = 0
+      events.push(...backup.stores.events)
+      library.clear()
+      backup.stores.library.forEach((l) => library.set(l.workId, l))
+      progress.clear()
+      backup.stores.progress.forEach((p) => progress.set(p.workId, p))
+      settings = backup.stores.settings[0] ?? { ...defaults }
+    },
+    deleteAll: async () => {
+      profile = undefined
+      events.length = 0
+      library.clear()
+      progress.clear()
+      settings = { ...defaults }
+    },
+  }
   return {
+    dataStore,
     progressStore,
     settingsStore,
     eventLog,

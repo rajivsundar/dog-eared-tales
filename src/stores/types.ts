@@ -108,6 +108,10 @@ export interface Settings {
   shortlist?: DailyShortlist
   /** Today's Your Long List, kept like the shortlist. */
   longList?: DailyShortlist
+  /** Whether we have asked the browser to protect this data from automatic clearing, and its answer. */
+  persistence?: { requested: boolean; granted: boolean }
+  /** The install offer on the end screen is shown once. */
+  installOffered?: boolean
 }
 
 export interface ProfileStore {

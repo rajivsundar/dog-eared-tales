@@ -16,6 +16,7 @@ import { useDogEar } from '../library/useDogEar'
 import { UndoToast } from '../ui/UndoToast'
 import { DetailSheet } from '../detail/DetailSheet'
 import { minutesLabel } from '../detail/labels'
+import { requestPersistenceIfEarned } from '../storage/persistence'
 import { OfflineBadge } from '../offline/OfflineBadge'
 import { useAutoCache, useCachedTexts } from '../offline/useOffline'
 import { LongListSection } from './LongListSection'
@@ -70,6 +71,10 @@ export function ShortlistScreen() {
           progress: progressStore,
         }
         const list = await loadShortlist(deps, now)
+        void requestPersistenceIfEarned({
+          settings: settingsStore,
+          events: eventLog,
+        })
         if (cancelled) return
         const long = await loadLongList(
           deps,

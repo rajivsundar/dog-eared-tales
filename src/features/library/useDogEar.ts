@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { type SavedWork, eventLog, libraryStore } from '../../stores'
+import {
+  type SavedWork,
+  eventLog,
+  libraryStore,
+  settingsStore,
+} from '../../stores'
+import { requestPersistenceIfEarned } from '../storage/persistence'
 import { addDogEar, removeDogEar, restoreDogEar } from './dogEar'
 
 export interface DogEarRemoval {
@@ -61,7 +67,14 @@ export function useDogEar() {
     } else {
       setIds((prev) => new Set(prev).add(workId))
       setRemoved(null)
-      enqueue(() => addDogEar(deps, workId))
+      enqueue(async () => {
+        await addDogEar(deps, workId)
+        // The first Dog-ear asks the browser to protect the data (once).
+        await requestPersistenceIfEarned({
+          settings: settingsStore,
+          events: eventLog,
+        })
+      })
     }
   }
 

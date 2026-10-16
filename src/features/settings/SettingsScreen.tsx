@@ -2,7 +2,11 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { loadCatalog } from '../../catalog'
 import { WEIGHT_MAX, buildProfile, topFacets } from '../../engine/recommend'
+import { InstallControl } from '../../pwa/InstallControl'
+import { useInstallMode } from '../../pwa/install'
 import { eventLog, profileStore } from '../../stores'
+import { DataSection } from '../data/DataSection'
+import { StorageSection } from '../storage/StorageSection'
 import type { Profile } from '../../stores'
 
 type Beliefs = Profile['facetBeliefs']
@@ -77,6 +81,8 @@ export function SettingsScreen() {
       })
   }
 
+  const installMode = useInstallMode()
+
   const moods = beliefs ? topFacets(beliefs, 'mood') : []
   const genres = beliefs ? topFacets(beliefs, 'genre') : []
 
@@ -142,6 +148,21 @@ export function SettingsScreen() {
           </div>
         )}
       </section>
+
+      {installMode !== 'hidden' && (
+        <section aria-labelledby="install-title" className="mt-10">
+          <h2 id="install-title" className="font-serif text-2xl font-bold">
+            Install
+          </h2>
+          <div className="mt-3">
+            <InstallControl />
+          </div>
+        </section>
+      )}
+
+      <StorageSection />
+
+      <DataSection />
 
       <section aria-labelledby="about-title" className="mt-10">
         <h2 id="about-title" className="font-serif text-2xl font-bold">

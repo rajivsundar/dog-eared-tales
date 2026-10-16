@@ -12,6 +12,8 @@ import {
 import { eventLog, progressStore, settingsStore } from '../../stores'
 import { recordRating } from '../checkin/rating'
 import { useDogEar } from '../library/useDogEar'
+import { requestPersistenceIfEarned } from '../storage/persistence'
+import { useInstallOffer } from '../storage/useInstallOffer'
 import { useReadingSession } from './useReadingSession'
 import { UndoToast } from '../ui/UndoToast'
 import { AaPanel } from './AaPanel'
@@ -127,7 +129,12 @@ function Reader({ id }: { id: string }) {
           if (finished) return
           finished = true
           setPhase('finished')
-          void tracker?.finished()
+          void tracker?.finished().then(() =>
+            requestPersistenceIfEarned({
+              settings: settingsStore,
+              events: eventLog,
+            }),
+          )
         })
         await engine.open(found.textUrl, {
           startHref: found.startHref,
@@ -207,6 +214,8 @@ function Reader({ id }: { id: string }) {
       theme: next.theme,
     })
   }
+
+  const offerInstall = useInstallOffer(phase === 'finished')
 
   const colors = THEME_COLORS[resolveTheme(style.theme, dark)]
   const percentLeft = location ? location.fraction : 0
@@ -331,6 +340,7 @@ function Reader({ id }: { id: string }) {
       {phase === 'finished' && entry && (
         <EndScreen
           title={entry.title}
+          offerInstall={offerInstall}
           onBack={() => navigate('/')}
           onRate={(rating, reason) =>
             recordRating(eventLog, id, rating, reason).catch((error: unknown) =>

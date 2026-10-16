@@ -12,3 +12,9 @@ Offline and install support (vite-plugin-pwa, Workbox; configured in vite.config
 ## Offline books
 
 `src/pwa/textCache.ts` quietly stores book files in the `twice-told-texts` cache ahead of time: every pick on today's Your Shortlist and Your Long List, and every Dog-eared and Reading work (`features/offline/offlineTargets.ts`). Each file is fetched once, nothing is stored offline or with under 50 MB free, and cards, the Library and the detail sheet show an "Available offline" icon for stored books. Opening an unsaved book while offline shows a friendly message instead of the error page.
+
+## Install and storage
+
+- `install.ts` / `InstallControl.tsx`: captures `beforeinstallprompt` for an "Install Twice Told" button (Android, desktop Chrome and Edge), shows Share → Add to Home Screen steps on iPhone and iPad Safari, and shows nothing when running standalone.
+- `features/storage/persistence.ts`: asks for `navigator.storage.persist()` once, after the first Dog-ear or first finished work.
+- Backups are manual JSON exports (`stores/backup.ts`); there is no sync until R3.

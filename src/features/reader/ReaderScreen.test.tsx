@@ -13,6 +13,7 @@ import type {
   OpenOptions,
   ReaderStyle,
 } from '../../engine/reader'
+import { setDeferredPromptForTest } from '../../pwa/install'
 import ReaderScreen from './ReaderScreen'
 
 // ---------------------------------------------------------------- stand-ins for the engine, stores and catalog
@@ -45,7 +46,10 @@ const h = vi.hoisted(() => {
     FakeEngine,
     engines: [] as InstanceType<typeof FakeEngine>[],
     progressStore: { get: vi.fn(), set: vi.fn(async (p: unknown) => p) },
-    eventLog: { append: vi.fn(async (e: unknown) => e) },
+    eventLog: {
+      append: vi.fn(async (e: unknown) => e),
+      list: vi.fn(async () => [] as unknown[]),
+    },
     libraryStore: {
       list: vi.fn(async () => [] as unknown[]),
       get: vi.fn(),
@@ -131,6 +135,7 @@ async function open(path = `/read/${entry.id}`) {
 }
 
 beforeEach(() => {
+  h.eventLog.list.mockResolvedValue([])
   h.libraryStore.list.mockResolvedValue([])
   h.libraryStore.get.mockResolvedValue(undefined)
   h.engines.length = 0
@@ -688,5 +693,142 @@ describe('opening a book that is not stored while offline', () => {
     ).toBeInTheDocument()
     expect(screen.queryByTestId('offline-message')).not.toBeInTheDocument()
     error.mockRestore()
+  })
+})
+
+describe('the install offer and asking to protect the data', () => {
+  const finishedEvent = (workId: string) => ({
+    id: workId,
+    workId,
+    type: 'finished',
+    at: 1,
+  })
+  const promptEvent = () => {
+    const e = new Event('beforeinstallprompt') as Event & {
+      prompt: () => Promise<void>
+      userChoice: Promise<{ outcome: string }>
+    }
+    e.prompt = vi.fn(async () => {})
+    e.userChoice = Promise.resolve({ outcome: 'accepted' })
+    return e
+  }
+  const environment = (standalone: boolean, userAgent?: string) => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn((query: string) => ({
+        matches: query === '(display-mode: standalone)' && standalone,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      })),
+    )
+    if (userAgent) {
+      Object.defineProperty(navigator, 'userAgent', {
+        configurable: true,
+        value: userAgent,
+      })
+    }
+  }
+  const finish = async () => {
+    const engine = await open()
+    act(() => engine.locationCallbacks[0](loc(0.99, { atEnd: true })))
+    act(() => engine.endCallbacks[0]())
+    return screen.findByTestId('end-screen')
+  }
+
+  beforeEach(() => {
+    setDeferredPromptForTest(null)
+    environment(false)
+    h.eventLog.list.mockResolvedValue([finishedEvent(entry.id)])
+  })
+  afterEach(() => {
+    setDeferredPromptForTest(null)
+    vi.unstubAllGlobals()
+    Reflect.deleteProperty(navigator, 'userAgent')
+    Reflect.deleteProperty(navigator, 'storage')
+  })
+
+  it('offers the install once, gently, on the end screen after the first finished story', async () => {
+    setDeferredPromptForTest(promptEvent())
+    const end = await finish()
+    const offer = await within(end).findByTestId('install-offer')
+    expect(
+      within(offer).getByRole('button', { name: 'Install Twice Told' }),
+    ).toBeInTheDocument()
+    expect(h.settingsStore.update).toHaveBeenCalledWith({
+      installOffered: true,
+    })
+  })
+
+  it('never offers it when the app is already installed (standalone)', async () => {
+    environment(true)
+    setDeferredPromptForTest(promptEvent())
+    const end = await finish()
+    await act(async () => {})
+    expect(within(end).queryByTestId('install-offer')).not.toBeInTheDocument()
+    expect(h.settingsStore.update).not.toHaveBeenCalledWith({
+      installOffered: true,
+    })
+  })
+
+  it('does not offer it a second time', async () => {
+    h.settingsStore.get.mockResolvedValue({ ...SETTINGS, installOffered: true })
+    setDeferredPromptForTest(promptEvent())
+    const end = await finish()
+    await act(async () => {})
+    expect(within(end).queryByTestId('install-offer')).not.toBeInTheDocument()
+  })
+
+  it('does not offer it after a later finished story (only the first)', async () => {
+    h.eventLog.list.mockResolvedValue([
+      finishedEvent('another-story'),
+      finishedEvent(entry.id),
+    ])
+    setDeferredPromptForTest(promptEvent())
+    const end = await finish()
+    await act(async () => {})
+    expect(within(end).queryByTestId('install-offer')).not.toBeInTheDocument()
+  })
+
+  it('shows Share → Add to Home Screen steps on iPhone Safari', async () => {
+    environment(
+      false,
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+    )
+    const end = await finish()
+    const offer = await within(end).findByTestId('install-offer')
+    expect(within(offer).getByTestId('ios-install')).toHaveTextContent(
+      'Add to Home Screen',
+    )
+  })
+
+  it('asks the browser to protect the data after the first finished story, once', async () => {
+    const persist = vi.fn(async () => true)
+    Object.defineProperty(navigator, 'storage', {
+      configurable: true,
+      value: { persist },
+    })
+    await finish()
+    await waitFor(() => expect(persist).toHaveBeenCalledTimes(1))
+    expect(h.settingsStore.update).toHaveBeenCalledWith({
+      persistence: { requested: true, granted: true },
+    })
+  })
+
+  it('asks after the first Dog-ear too', async () => {
+    const persist = vi.fn(async () => true)
+    Object.defineProperty(navigator, 'storage', {
+      configurable: true,
+      value: { persist },
+    })
+    h.eventLog.list.mockResolvedValue([
+      { id: 's', workId: entry.id, type: 'save', at: 1 },
+    ])
+    await open()
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Dog-ear it for later' }),
+      )
+    })
+    await waitFor(() => expect(persist).toHaveBeenCalledTimes(1))
   })
 })
