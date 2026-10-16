@@ -6,7 +6,7 @@ Dated 2026-10-15.
 - **Code hosting:** private GitHub repo rajivsundar/twice-told; CI is GitHub Actions. No Gitea or Gitea Actions.
 - **Deployment:** Cloudflare Workers static assets via `wrangler deploy`, replacing Cloudflare Pages Direct Upload (D10, EN-1203).
 - **Hosting (temporary):** twicetold.netlify.app is a preview with auto-deploys stopped; deploy manually only. Phase 8 moves production to Cloudflare Workers static assets as planned.
-- **Cloudflare setup:** assets only, no Worker code (`wrangler.jsonc`: `./dist`, `not_found_handling: single-page-application`). `public/.assetsignore` keeps Netlify's `_redirects` out of the upload; `public/_headers` sets no-cache on `sw.js` and the manifest and long caching on `/assets/*`. `npm run deploy:dry` checks it without uploading.
+- **Cloudflare setup:** assets only, no Worker code (`wrangler.jsonc`: `./dist`, `not_found_handling: single-page-application`). There is no `_redirects` file (Cloudflare reads it and rejects `/*  /index.html  200` as an infinite loop; Netlify is retired). `public/.assetsignore` keeps itself out of the upload; `public/_headers` sets no-cache on `sw.js` and the manifest and long caching on `/assets/*`. `npm run deploy:dry` checks it without uploading.
 - **Branching:** work on `main`, with optional pull requests; no dev/test branches yet.
 - **Catalog:** a hand-picked starter catalog of 28 entries from 24 unchanged Project Gutenberg EPUBs, defined in `content/sources.csv`. Stories inside collections are href ranges in the original file, not split files. The harvester (EN-202) and Standard Ebooks feeds are deferred.
 - **Covers:** simple generated SVG covers for now; AI cover art is deferred.

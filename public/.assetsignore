@@ -1,4 +1,2 @@
-# Files that Netlify reads but Cloudflare must not upload.
-# _redirects is Netlify's single-page fallback; Cloudflare uses not_found_handling in wrangler.jsonc instead.
-_redirects
+# Files in this folder that Cloudflare must not upload as assets.
 .assetsignore

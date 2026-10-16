@@ -45,7 +45,7 @@ export default defineConfig({
         ],
         // Never precache the book texts: they are large and are cached as they are opened.
         globIgnores: ['texts/**'],
-        // Pages such as /read/:id and /library open offline, like the Netlify _redirects rule.
+        // Pages such as /read/:id and /library open offline, as not_found_handling does on Cloudflare (see wrangler.jsonc).
         navigateFallback: 'index.html',
         navigateFallbackDenylist: [/^\/texts\//, /^\/catalog\//, /^\/covers\//],
         cleanupOutdatedCaches: true,
