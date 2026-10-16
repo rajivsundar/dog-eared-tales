@@ -13,4 +13,5 @@ Dated 2026-10-15.
 - **Offline:** new story "Auto-cache Your Shortlist"; caching is Workbox precache for the shell and catalog, runtime cache-first for texts, Dexie for reader data, and OPFS for future AI models.
 - **Naming:** Twice Told and the labels in CONTEXT.md; the mock-up images in `docs/` still show old labels.
 - **Initial build scope:** Your Long List (simplified US-501) and the Tonight's Shortlist title (6 pm–4 am) are in the initial build.
+- **Generated files:** `public/catalog`, `public/texts` and `public/covers` are rebuilt from `content/` by `npm run catalog` (run automatically before `dev` and `build`) and are not committed.
 - **Dev environment:** Windows, PowerShell.

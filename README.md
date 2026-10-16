@@ -32,13 +32,14 @@ Your reading data stays on your device. There are no accounts, no server databas
 
 ## Getting started
 
-Requires Node.js (LTS).
+Requires Node.js 24 or newer (the catalog script runs TypeScript directly).
 
 ```bash
 npm install
-npm run catalog   # build the catalog from content/
 npm run dev       # start at http://localhost:5173
 ```
+
+`npm run dev` and `npm run build` first run `npm run catalog`, which rebuilds `public/catalog/`, `public/texts/` and `public/covers/` from `content/`. Those folders are generated and not committed.
 
 | Script | What it does |
 | --- | --- |

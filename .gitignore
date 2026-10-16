@@ -3,3 +3,6 @@ dist
 .env*
 playwright-report
 test-results
+public/catalog/
+public/texts/
+public/covers/

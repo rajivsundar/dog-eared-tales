@@ -54,4 +54,9 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    // Build scripts run in Node, not in the browser.
+    files: ['scripts/**/*.ts'],
+    languageOptions: { globals: globals.node },
+  },
 )
