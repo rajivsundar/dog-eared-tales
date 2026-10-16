@@ -38,3 +38,9 @@ The taste profile is rebuilt from the event log, so the log stays the source of 
 Not for me reasons aim the push: "too long" hits the length only, "not my genre" the genres only, "too dark" the mood dark (and nudges the story's other moods by -0.5), "too old-fashioned" is a mild -0.5, and "already read" teaches nothing.
 
 An event's push halves every 60 days. Each mood, genre and length weight is then kept between -5 and +8. A reset event makes everything before it count for nothing. The wildcard ranks as if no mood were marked down; excluded works are still skipped.
+
+## Your Long List (`longList.ts`, `sessions.ts`)
+
+Appears once the reader has finished at least 3 works rated Loved it or It was OK (since any taste reset). Up to 4 novelettes or novellas, ranked by the learned mood and genre weights, skipping finished works, Not for me works and today's shortlist. If the weight for the longest length class is below -2, at most 1 is shown. A pick is rotated out after it has been shown on 7 different days without a tap.
+
+A sitting is the median of the last 10 `session` events (active seconds recorded by the reader; under 30 seconds is ignored), defaulting to 15 minutes until there are 3, rounded to the nearest 5 minutes.

@@ -15,7 +15,11 @@ export function whyThisPick(
   entry: CatalogEntry,
   reason: string,
   beliefs: Profile['facetBeliefs'],
+  kind: 'shortlist' | 'long' = 'shortlist',
 ): string {
+  if (kind === 'long') {
+    return 'A longer read for when you are ready, ranked by the moods and genres you have liked. It is split into sittings that fit how you usually read.'
+  }
   if (reason.startsWith('A good place to start')) {
     return 'You have not told us your taste yet, so this is part of a varied starter mix. Rate a few stories and your picks will tune themselves.'
   }

@@ -7,7 +7,7 @@ import {
   within,
 } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   LocationInfo,
   OpenOptions,
@@ -532,5 +532,112 @@ describe('the check-in', () => {
       fireEvent.click(within(end).getByRole('button', { name: 'Skip' }))
     })
     expect(rated()).toEqual([{ workId: entry.id, type: 'notForMe' }])
+  })
+})
+
+describe('reading sessions', () => {
+  const START = new Date(2026, 9, 16, 10, 0, 0).getTime()
+  let visibility = 'visible'
+  const sessionEvents = () =>
+    h.eventLog.append.mock.calls
+      .map(([e]) => e as { workId: string; type: string; value?: number })
+      .filter((e) => e.type === 'session')
+  const later = (seconds: number) =>
+    vi.setSystemTime(Date.now() + seconds * 1000)
+  const setVisibility = (state: 'hidden' | 'visible') => {
+    visibility = state
+    document.dispatchEvent(new Event('visibilitychange'))
+  }
+
+  beforeEach(() => {
+    visibility = 'visible'
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => visibility,
+    })
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(START)
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    Reflect.deleteProperty(document, 'visibilityState')
+  })
+
+  it('saves the session when the tab is hidden', async () => {
+    await open()
+    later(90)
+    setVisibility('hidden')
+    await waitFor(() =>
+      expect(sessionEvents()).toEqual([
+        { workId: entry.id, type: 'session', value: 90 },
+      ]),
+    )
+  })
+
+  it('starts a new session when the tab is shown again', async () => {
+    await open()
+    later(60)
+    setVisibility('hidden')
+    later(600) // away
+    setVisibility('visible')
+    later(45)
+    setVisibility('hidden')
+    await waitFor(() =>
+      expect(sessionEvents().map((s) => s.value)).toEqual([60, 45]),
+    )
+  })
+
+  it('saves the session when the page is hidden (pagehide)', async () => {
+    await open()
+    later(120)
+    window.dispatchEvent(new Event('pagehide'))
+    await waitFor(() =>
+      expect(sessionEvents().map((s) => s.value)).toEqual([120]),
+    )
+  })
+
+  it('saves the session when the reader navigates away', async () => {
+    await open()
+    later(75)
+    fireEvent.click(screen.getByText('‹ Back'))
+    await waitFor(() =>
+      expect(sessionEvents().map((s) => s.value)).toEqual([75]),
+    )
+  })
+
+  it('ignores a session under 30 seconds', async () => {
+    await open()
+    later(20)
+    setVisibility('hidden')
+    fireEvent.click(screen.getByText('‹ Back'))
+    await Promise.resolve()
+    expect(sessionEvents()).toEqual([])
+  })
+
+  it('pauses after 3 minutes without a page turn, and a page turn counts as activity', async () => {
+    const engine = await open()
+    later(30)
+    act(() => engine.locationCallbacks.forEach((cb) => cb(loc(0.2))))
+    later(20 * 60) // 20 minutes on one page
+    act(() => engine.locationCallbacks.forEach((cb) => cb(loc(0.3))))
+    later(10)
+    setVisibility('hidden')
+    // 30 s + 3 min of the long wait + 10 s.
+    await waitFor(() =>
+      expect(sessionEvents().map((s) => s.value)).toEqual([30 + 180 + 10]),
+    )
+  })
+
+  it('counts a tap or a scroll as activity too', async () => {
+    await open()
+    later(30)
+    window.dispatchEvent(new Event('pointerdown'))
+    later(15 * 60)
+    window.dispatchEvent(new Event('scroll'))
+    later(5)
+    setVisibility('hidden')
+    await waitFor(() =>
+      expect(sessionEvents().map((s) => s.value)).toEqual([30 + 180 + 5]),
+    )
   })
 })

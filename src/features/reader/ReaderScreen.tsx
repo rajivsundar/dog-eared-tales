@@ -12,6 +12,7 @@ import {
 import { eventLog, progressStore, settingsStore } from '../../stores'
 import { recordRating } from '../checkin/rating'
 import { useDogEar } from '../library/useDogEar'
+import { useReadingSession } from './useReadingSession'
 import { UndoToast } from '../ui/UndoToast'
 import { AaPanel } from './AaPanel'
 import { EndScreen } from './EndScreen'
@@ -51,6 +52,7 @@ function Reader({ id }: { id: string }) {
   const navigate = useNavigate()
   const dark = useDeviceIsDark()
   const dogEar = useDogEar()
+  const sessionActivity = useReadingSession(id)
   const dogEared = dogEar.ids.has(id)
   const dogEarLabel = dogEared ? 'Dog-eared' : 'Dog-ear it for later'
 
@@ -118,6 +120,7 @@ function Reader({ id }: { id: string }) {
         let finished = false
         engine.onLocation((loc) => {
           setLocation(loc)
+          sessionActivity()
           void tracker?.location(loc)
         })
         engine.onRangeEnd(() => {
@@ -150,7 +153,7 @@ function Reader({ id }: { id: string }) {
       engineRef.current = null
       engine?.close()
     }
-  }, [id])
+  }, [id, sessionActivity])
 
   // Keep a device-theme reader in step with the device.
   useEffect(() => {

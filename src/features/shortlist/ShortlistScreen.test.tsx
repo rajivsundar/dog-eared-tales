@@ -1,4 +1,11 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetCatalogCache } from '../../catalog'
@@ -286,5 +293,176 @@ describe('Not for me', () => {
       vi.advanceTimersByTime(5000)
     })
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+})
+
+describe('Your Long List', () => {
+  // story-0..2 are short stories; the rest are novelettes and novellas of an hour.
+  function stubLongCatalog() {
+    resetCatalogCache()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          schemaVersion: 1,
+          entries: Array.from({ length: 24 }, (_, i) => ({
+            ...fakeCatalog()[i % 10],
+            id: `story-${i}`,
+            title: `Story ${i}`,
+            form: i < 3 ? 'story' : i % 2 === 0 ? 'novella' : 'novelette',
+            lengthClass: i < 3 ? 'under10' : '60plus',
+            readingMinutes: i < 3 ? 8 : 60,
+          })),
+        }),
+      })),
+    )
+  }
+  const rateThree = async () => {
+    for (const id of ['story-0', 'story-1', 'story-2']) {
+      await stores.eventLog.append({ workId: id, type: 'finished' })
+      await stores.eventLog.append({ workId: id, type: 'love' })
+    }
+  }
+
+  it('is not on the page before 3 positive finishes, not even an empty heading', async () => {
+    stubLongCatalog()
+    renderHome()
+    await screen.findAllByRole('listitem')
+    expect(screen.queryByText('Your Long List')).not.toBeInTheDocument()
+  })
+
+  it('appears below Your Shortlist after 3, with sittings on each card', async () => {
+    stubLongCatalog()
+    await rateThree()
+    renderHome()
+    const heading = await screen.findByRole('heading', {
+      name: 'Your Long List',
+    })
+    const shortlist = screen.getByRole('heading', { name: /Shortlist/ })
+    expect(
+      shortlist.compareDocumentPosition(heading) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    const section = heading.closest('section')!
+    const cards = within(section).getAllByRole('listitem')
+    expect(cards.length).toBeGreaterThan(0)
+    expect(cards.length).toBeLessThanOrEqual(4)
+    // Total minutes and the default 15-minute sitting.
+    expect(cards[0]).toHaveTextContent('60 min')
+    expect(cards[0]).toHaveTextContent('About 4 sittings of 15 min')
+    expect(cards[0].querySelector('img')).not.toBeNull()
+  })
+
+  it('uses the median of the latest sessions for the sitting', async () => {
+    stubLongCatalog()
+    await rateThree()
+    for (const seconds of [1700, 1800, 1900]) {
+      await stores.eventLog.append({
+        workId: 'story-3',
+        type: 'session',
+        value: seconds,
+      })
+    }
+    renderHome()
+    const heading = await screen.findByRole('heading', {
+      name: 'Your Long List',
+    })
+    expect(
+      within(heading.closest('section')!).getAllByRole('listitem')[0],
+    ).toHaveTextContent('About 2 sittings of 30 min')
+  })
+
+  it('never repeats a work from Your Shortlist', async () => {
+    stubLongCatalog()
+    await rateThree()
+    renderHome()
+    const heading = await screen.findByRole('heading', {
+      name: 'Your Long List',
+    })
+    const longTitles = within(heading.closest('section')!)
+      .getAllByRole('listitem')
+      .map((li) => li.querySelector('span.font-serif')?.textContent)
+    const shortSection = screen
+      .getByRole('heading', { name: /Shortlist/ })
+      .closest('section')!
+    const shortTitles = within(shortSection)
+      .getAllByRole('listitem')
+      .map((li) => li.querySelector('span.font-serif')?.textContent)
+    for (const t of longTitles) expect(shortTitles).not.toContain(t)
+  })
+
+  it('opens the same detail sheet, and records a tap', async () => {
+    stubLongCatalog()
+    await rateThree()
+    renderHome()
+    const heading = await screen.findByRole('heading', {
+      name: 'Your Long List',
+    })
+    const card = within(heading.closest('section')!).getAllByRole('listitem')[0]
+    fireEvent.click(within(card).getByRole('button'))
+    const sheet = await screen.findByRole('dialog')
+    expect(within(sheet).getByRole('button', { name: 'Dog-ear' })).toBeVisible()
+    expect(
+      within(sheet).getByRole('button', { name: 'Not for me' }),
+    ).toBeVisible()
+    expect(within(sheet).getByTestId('why-this-pick')).toHaveTextContent(
+      /longer read/,
+    )
+    expect(stores.events.filter((e) => e.type === 'tap')).toHaveLength(1)
+  })
+
+  it('Not for me on a Long List card swaps it, and Undo brings it back', async () => {
+    stubLongCatalog()
+    await rateThree()
+    renderHome()
+    const heading = await screen.findByRole('heading', {
+      name: 'Your Long List',
+    })
+    const section = heading.closest('section')!
+    const before = within(section)
+      .getAllByRole('listitem')
+      .map((li) => li.textContent)
+    fireEvent.click(
+      within(within(section).getAllByRole('listitem')[0]).getByRole('button'),
+    )
+    const sheet = await screen.findByRole('dialog')
+    await act(async () => {
+      fireEvent.click(within(sheet).getByRole('button', { name: 'Not for me' }))
+    })
+    const titles = () =>
+      within(section)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent)
+    await waitFor(() => expect(titles()).not.toContain(before[0]))
+    // The other cards are untouched, and the removed one is replaced in its place (or dropped).
+    for (const kept of before.slice(1)) expect(titles()).toContain(kept)
+    expect(screen.getByRole('status')).toHaveTextContent('Removed ·')
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    })
+    expect(
+      within(section)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual(before)
+  })
+
+  it('records shown once per day for its cards', async () => {
+    stubLongCatalog()
+    await rateThree()
+    const first = renderHome()
+    const heading = await screen.findByRole('heading', {
+      name: 'Your Long List',
+    })
+    const n = within(heading.closest('section')!).getAllByRole(
+      'listitem',
+    ).length
+    first.unmount()
+    renderHome()
+    await screen.findByRole('heading', { name: 'Your Long List' })
+    const shown = stores.events.filter((e) => e.type === 'shown')
+    expect(shown).toHaveLength(6 + n)
   })
 })

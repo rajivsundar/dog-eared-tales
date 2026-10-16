@@ -30,6 +30,7 @@ export type ReaderEventType =
   | 'undo'
   | 'reset'
   | 'onboard'
+  | 'session'
   | 'finished'
   | 'stopped'
   | 'abandoned'
@@ -105,6 +106,8 @@ export interface Settings {
   aiPrefs: Record<string, unknown>
   contentFilters: Record<string, unknown>
   shortlist?: DailyShortlist
+  /** Today's Your Long List, kept like the shortlist. */
+  longList?: DailyShortlist
 }
 
 export interface ProfileStore {
