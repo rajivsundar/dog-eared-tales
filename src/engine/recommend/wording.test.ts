@@ -31,6 +31,14 @@ const GENRES = [
   'literary',
   'philosophy',
   'social criticism',
+  'politics',
+  'history',
+  'memoir',
+  'spirituality',
+  'self-help',
+  'science',
+  'war',
+  'fantasy',
 ]
 
 function entry(changes: Partial<CatalogEntry> = {}): CatalogEntry {
@@ -61,6 +69,14 @@ describe('genre wording', () => {
       literary: 'literary stories',
       philosophy: 'philosophy',
       'social criticism': 'social criticism',
+      politics: 'politics',
+      history: 'history',
+      memoir: 'memoir',
+      spirituality: 'spirituality',
+      'self-help': 'self-help',
+      science: 'science',
+      war: 'war stories',
+      fantasy: 'fantasy stories',
     })
   })
 
@@ -87,12 +103,20 @@ describe('genre wording', () => {
       literary: 'literary story',
       philosophy: 'philosophical work',
       'social criticism': 'work of social criticism',
+      politics: 'political work',
+      history: 'work of history',
+      memoir: 'memoir',
+      spirituality: 'spiritual work',
+      'self-help': 'self-help book',
+      science: 'science writing',
+      war: 'war story',
+      fantasy: 'fantasy story',
     })
   })
 
   it('never leaves a bare adjective: every phrase has a noun', () => {
     const nouns =
-      /(stories|story|essays|essay|satire|humour|romance|philosophy|social criticism|romance|work)\b/
+      /(stories|story|essays|essay|satire|humour|romance|philosophy|social criticism|politics|history|memoir|spirituality|self-help|science|work|book|writing)\b/
     for (const genre of GENRES) {
       for (const form of ['story', 'novelette', 'novella', 'essay'] as const) {
         expect(genrePlural(genre, form), `${genre}/${form}`).toMatch(nouns)
@@ -130,6 +154,14 @@ describe('"Because you like …" reasons', () => {
       literary: 'literary stories',
       philosophy: 'philosophy',
       'social criticism': 'social criticism',
+      politics: 'politics',
+      history: 'history',
+      memoir: 'memoir',
+      spirituality: 'spirituality',
+      'self-help': 'self-help',
+      science: 'science',
+      war: 'war stories',
+      fantasy: 'fantasy stories',
     }
     for (const genre of GENRES) {
       const e = entry({ genres: [genre], moods: ['eerie'] })
@@ -202,6 +234,14 @@ describe('other reason lines', () => {
       literary: 'literary story',
       philosophy: 'philosophical work',
       'social criticism': 'work of social criticism',
+      politics: 'political work',
+      history: 'work of history',
+      memoir: 'memoir',
+      spirituality: 'spiritual work',
+      'self-help': 'self-help book',
+      science: 'science writing',
+      war: 'war story',
+      fantasy: 'fantasy story',
     }
     for (const genre of GENRES) {
       const pick = entry({

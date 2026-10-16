@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { readFileSync } from 'node:fs'
 import { beforeAll, describe, expect, it } from 'vitest'
 import {
   type BaseEntry,
@@ -100,14 +101,187 @@ beforeAll(() => {
   result = buildCatalog()
 }, 60_000)
 
-describe('catalog entries', () => {
-  it('has the 28 expected entries', () => {
-    expect(result.entries.map((e) => e.id).sort()).toEqual(
-      Object.keys(INVENTORY).sort(),
-    )
-    expect(result.epubs.size).toBe(24)
+/** The curation records in content/curation.json, by entry id. */
+function curationRecords(): Record<string, { reviewed?: boolean }> {
+  const file = JSON.parse(
+    readFileSync(new URL('../content/curation.json', import.meta.url), 'utf8'),
+  ) as { entries: Record<string, { reviewed?: boolean }> }
+  return file.entries
+}
+
+const EPUB_NUMBER = /^\/texts\/pg-(\d+)\.epub$/
+
+describe('which entries ship', () => {
+  it('ships exactly the sources.csv rows that have a reviewed curation record', () => {
+    const records = curationRecords()
+    const expected = result.base
+      .filter((b) => records[b.id]?.reviewed === true)
+      .map((b) => b.id)
+      .sort()
+    expect(result.entries.map((e) => e.id).sort()).toEqual(expected)
+    expect(result.entries.length).toBeGreaterThan(0)
   })
 
+  it('builds and checks every row of sources.csv, shipped or not', () => {
+    const csv = readFileSync(
+      new URL('../content/sources.csv', import.meta.url),
+      'utf8',
+    )
+    expect(result.base).toHaveLength(parseCsv(csv).length)
+    expect(new Set(result.base.map((b) => b.id)).size).toBe(result.base.length)
+    expect(result.entries.length + result.skipped.length).toBe(
+      result.base.length,
+    )
+  })
+
+  it('holds back every row without a reviewed record, and says so', () => {
+    const records = curationRecords()
+    const shipped = new Set(result.entries.map((e) => e.id))
+    for (const b of result.skipped) {
+      expect(shipped.has(b.id), b.id).toBe(false)
+      expect(records[b.id]?.reviewed === true, b.id).toBe(false)
+    }
+  })
+
+  it('publishes only the books of entries that ship', () => {
+    const numbers = new Set(
+      result.entries.map((e) => EPUB_NUMBER.exec(e.textUrl)?.[1]),
+    )
+    expect(new Set(result.epubs.keys())).toEqual(numbers)
+    expect(result.epubs.size).toBeGreaterThan(0)
+  })
+
+  it('still ships the original 28 entries', () => {
+    const shipped = new Set(result.entries.map((e) => e.id))
+    for (const id of Object.keys(INVENTORY))
+      expect(shipped.has(id), id).toBe(true)
+  })
+})
+
+describe('every row of sources.csv (including the ones not shipped yet)', () => {
+  it('has a real range: hrefs, a first line from the text, and a positive word count', () => {
+    const squash = (s: string): string => s.replace(/\s+/g, ' ')
+    for (const b of result.base) {
+      expect(b.startHref, b.id).toBeTruthy()
+      expect(b.endHref, b.id).toBeTruthy()
+      expect(b.wordCount, b.id).toBeGreaterThan(0)
+      expect(squash(result.rangeText[b.id]), b.id).toContain(
+        squash(b.firstLine),
+      )
+      expect(b.textUrl, b.id).toMatch(EPUB_NUMBER)
+      expect(b.sha256, b.id).toMatch(/^[0-9a-f]{64}$/)
+    }
+  })
+
+  it('never lets a story run into the next one or into the licence', () => {
+    for (const b of result.base) {
+      const text = result.rangeText[b.id]
+      expect(text, b.id).not.toMatch(/\*\*\* (START|END) OF/)
+      expect(text, b.id).not.toContain('Project Gutenberg License')
+      expect(text, b.id).not.toContain('FULL PROJECT GUTENBERG')
+    }
+  })
+
+  it('has the new genres in the allowed list', () => {
+    for (const g of [
+      'politics',
+      'history',
+      'memoir',
+      'spirituality',
+      'self-help',
+      'science',
+      'war',
+      'fantasy',
+    ]) {
+      expect(GENRES).toContain(g)
+    }
+  })
+})
+
+describe('EPUB 2 books (no nav document, an NCX contents list)', () => {
+  const entry = (id: string): BaseEntry => {
+    const found = result.base.find((b) => b.id === id)
+    if (!found) throw new Error('no such row: ' + id)
+    return found
+  }
+
+  it('reads Miss Brill from pg-1429: it starts at its title and stops at its end', () => {
+    const miss = entry('pg-1429-miss-brill')
+    expect(miss.isCollection).toBe(true)
+    expect(miss.bookTitle).toBe('The Garden Party, and Other Stories')
+    expect(miss.startHref).toMatch(/_1429-h-9\.htm\.html#pgepubid00036$/)
+    expect(miss.endHref).toMatch(/_1429-h-10\.htm\.html#pgepubid00037$/)
+    const text = result.rangeText[miss.id].replace(/\s+/g, ' ').trim()
+    expect(text.startsWith('Miss Brill')).toBe(true)
+    expect(text).toContain('Although it was so brilliantly fine')
+    expect(text.endsWith('she heard something crying.')).toBe(true)
+    // It stops before the next story, Her First Ball, and does not start in the one before it.
+    expect(text).not.toContain('Her First Ball')
+    expect(text).not.toContain('Marriage')
+    expect(miss.wordCount).toBe(1949)
+  })
+
+  it('finds the licence of an EPUB 2 whole book from the Gutenberg footer heading', () => {
+    const prophet = entry('pg-58585-the-prophet')
+    expect(prophet.isCollection).toBe(false)
+    expect(prophet.startHref).toMatch(/#pgepubid00000$/)
+    expect(prophet.endHref).toMatch(/#pg-footer-heading$/)
+    expect(result.rangeText[prophet.id]).not.toContain('Project Gutenberg')
+    expect(prophet.wordCount).toBe(12580)
+  })
+
+  it('gives each EPUB 2 story the right word count from the inventory', () => {
+    const expected: Record<string, number> = {
+      'pg-1429-bank-holiday': 1242,
+      'pg-11870-the-red-room': 3625,
+      'pg-12758-the-necklace': 2895,
+      'pg-1732-misery': 2148,
+      'pg-13437-the-bet': 2719,
+      'pg-56870-twenty-six-of-us-and-one-other': 5970,
+    }
+    for (const [id, words] of Object.entries(expected)) {
+      expect(entry(id).wordCount, id).toBe(words)
+    }
+  })
+
+  it('keeps a story whole when its contents list splits the title from an epigraph or a part number', () => {
+    // Misery has a second contents entry for its epigraph; The Bet has a "II" part.
+    expect(result.rangeText['pg-1732-misery']).toContain(
+      'To whom shall I tell my grief?',
+    )
+    expect(result.rangeText['pg-13437-the-bet']).toMatch(/\bII\b/)
+  })
+
+  it('reads the EPUB 3 books exactly as before', () => {
+    const tell = entry('pg-2148-the-tell-tale-heart')
+    expect(tell.wordCount).toBe(2104)
+    expect(tell.startHref).toMatch(/\.htm\.xhtml#/)
+  })
+})
+
+describe('story_author', () => {
+  const find = (id: string): BaseEntry => result.base.find((b) => b.id === id)!
+
+  it('uses story_author when sources.csv gives one', () => {
+    expect(find('pg-13437-the-bet').author).toBe('Anton Pavlovich Chekhov')
+    expect(find('pg-12732-the-piece-of-string').author).toBe(
+      'Guy de Maupassant',
+    )
+    expect(find('pg-12758-the-necklace').author).toBe('Guy de Maupassant')
+    expect(find('pg-61-the-communist-manifesto').author).toBe(
+      'Karl Marx and Friedrich Engels',
+    )
+    expect(find('pg-2680-the-second-book').author).toBe('Marcus Aurelius')
+  })
+
+  it('otherwise uses the author in the EPUB', () => {
+    expect(find('pg-1429-miss-brill').author).toBe('Katherine Mansfield')
+    expect(find('pg-2814-eveline').author).toBe('James Joyce')
+    expect(find('pg-35-the-time-machine').author).toBe('H. G. Wells')
+  })
+})
+
+describe('catalog entries', () => {
   it('gives every entry every field', () => {
     for (const entry of result.entries) {
       for (const field of FIELDS) {
@@ -140,6 +314,7 @@ describe('catalog entries', () => {
   it('has word counts within 2% of the inventory', () => {
     for (const e of result.entries) {
       const expected = INVENTORY[e.id]
+      if (expected === undefined) continue
       expect(
         Math.abs(e.wordCount - expected) / expected,
         e.id,
@@ -332,11 +507,9 @@ describe('mergeCuration', () => {
     expect(merged[0].hook).toBe(record.hook)
   })
 
-  it('stops when an entry has no curation record', () => {
+  it('leaves out an entry that has no curation record (it is not ready to ship)', () => {
     const { base } = sample()
-    expect(() =>
-      mergeCuration([base], { schemaVersion: 1, entries: {} }),
-    ).toThrow(/no curation record/)
+    expect(mergeCuration([base], { schemaVersion: 1, entries: {} })).toEqual([])
   })
 
   it('stops when a record belongs to no catalog entry', () => {

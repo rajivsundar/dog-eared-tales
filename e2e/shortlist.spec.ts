@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { startApp } from './helpers'
+import { shippedCount, startApp } from './helpers'
 
 const sizes = [
   { name: 'phone (360 px wide)', width: 360, height: 740, columns: 1 },
@@ -71,7 +71,9 @@ test('Not for me swaps the card and Undo brings it back', async ({ page }) => {
   expect(await cards.allInnerTexts()).toEqual(before)
 })
 
-test('the full list stays at /all', async ({ page }) => {
+test('the full list stays at /all', async ({ page, request }) => {
   await page.goto('/all')
-  await expect(page.getByRole('main').getByRole('link')).toHaveCount(28)
+  await expect(page.getByRole('main').getByRole('link')).toHaveCount(
+    await shippedCount(request),
+  )
 })

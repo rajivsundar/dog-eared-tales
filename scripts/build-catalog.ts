@@ -26,6 +26,8 @@ const OUT_COVERS = path.join(ROOT, 'public', 'covers')
 
 const WORDS_PER_MINUTE = 238
 const LICENSE = 'Project Gutenberg License'
+/** The media type of an EPUB 2 table of contents. */
+const NCX_TYPE = 'application/x-dtbncx+xml'
 
 export type LengthClass = 'under10' | '10to30' | '30to60' | '60plus'
 
@@ -41,6 +43,14 @@ export const GENRES = [
   'literary',
   'philosophy',
   'social criticism',
+  'politics',
+  'history',
+  'memoir',
+  'spirituality',
+  'self-help',
+  'science',
+  'war',
+  'fantasy',
 ] as const
 export const MOODS = [
   'cozy',
@@ -138,10 +148,15 @@ export interface CatalogEntry extends Curation {
 export type BaseEntry = Omit<CatalogEntry, keyof Curation>
 
 export interface BuildResult {
+  /** The entries that ship: those with a curation record marked reviewed: true. */
   entries: CatalogEntry[]
-  /** The text range of each entry (by id), for tests. */
+  /** Every row of sources.csv, built and checked, whether or not it ships. */
+  base: BaseEntry[]
+  /** Rows held back because they have no reviewed curation record yet. */
+  skipped: BaseEntry[]
+  /** The text range of every entry (by id), for tests. */
   rangeText: Record<string, string>
-  /** Unique EPUBs to publish: Gutenberg number -> source file. */
+  /** Unique EPUBs to publish (only for entries that ship): Gutenberg number -> source file. */
   epubs: Map<string, string>
 }
 
@@ -345,7 +360,10 @@ function readEpub(file: string): Epub {
   const opf = read(opfPath)
   const base = path.posix.dirname(opfPath)
 
-  const manifest = new Map<string, { href: string; props: string }>()
+  const manifest = new Map<
+    string,
+    { href: string; props: string; type: string }
+  >()
   for (const m of opf.matchAll(/<item\b[^>]*>/g)) {
     const id = attr(m[0], 'id')
     const href = attr(m[0], 'href')
@@ -353,6 +371,7 @@ function readEpub(file: string): Epub {
       manifest.set(id, {
         href: resolvePath(base, href),
         props: attr(m[0], 'properties') ?? '',
+        type: attr(m[0], 'media-type') ?? '',
       })
   }
   const spine = [...opf.matchAll(/<itemref\b[^>]*>/g)].map((m) => {
@@ -366,19 +385,37 @@ function readEpub(file: string): Epub {
     stream += `\0${href}\0` + htmlToText(read(href), href)
   }
 
-  // The licence section starts at the table-of-contents entry labelled "...LICENSE".
+  // The licence section. EPUB 3 books list it in the table of contents ("...LICENSE").
+  // EPUB 2 books have no such entry, so use the Project Gutenberg footer heading, and failing
+  // that the file that holds the "*** END OF" line.
+  let licenseHref: string | undefined
   const nav = [...manifest.values()].find((i) =>
     i.props.split(/\s+/).includes('nav'),
   )
-  if (!nav) fail(`${file}: no navigation document (table of contents)`)
-  const navDir = path.posix.dirname(nav.href)
-  let licenseHref: string | undefined
-  for (const m of read(nav.href).matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/g)) {
-    const label = decodeEntities(m[2].replace(/<[^>]+>/g, '')).toUpperCase()
-    const href = attr(m[1], 'href')
-    if (href && label.includes('LICENSE')) {
-      licenseHref = resolvePath(navDir, href)
-      break
+  if (nav) {
+    const navDir = path.posix.dirname(nav.href)
+    for (const m of read(nav.href).matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/g)) {
+      const label = decodeEntities(m[2].replace(/<[^>]+>/g, '')).toUpperCase()
+      const href = attr(m[1], 'href')
+      if (href && label.includes('LICENSE')) {
+        licenseHref = resolvePath(navDir, href)
+        break
+      }
+    }
+  } else if (![...manifest.values()].some((i) => i.type === NCX_TYPE)) {
+    fail(
+      `${file}: no table of contents (neither a nav document nor an NCX file)`,
+    )
+  }
+  if (!licenseHref) {
+    const endLine = stream.indexOf('*** END OF')
+    const footer = /\0([^\0#]+#pg-footer-heading)\0/.exec(stream)
+    if (footer) {
+      licenseHref = footer[1]
+    } else if (endLine >= 0) {
+      // The file that holds the END line (the last file marker before it).
+      const files = [...stream.slice(0, endLine).matchAll(/\0([^\0#]+)\0/g)]
+      licenseHref = files[files.length - 1]?.[1]
     }
   }
   if (!licenseHref) fail(`${file}: Project Gutenberg licence section not found`)
@@ -743,7 +780,10 @@ function pickText(
   return value
 }
 
-/** Adds each entry's curation record. Stops if an entry has none, or a record is invalid or unused. */
+/**
+ * Adds each entry's curation record. An entry with no record is left out (it is not ready to ship
+ * yet). Stops if a record is invalid, or belongs to no catalog entry.
+ */
 export function mergeCuration(
   base: BaseEntry[],
   file: unknown,
@@ -761,11 +801,10 @@ export function mergeCuration(
         `content/curation.json has a record for ${id}, which is not a catalog entry`,
       )
   }
-  return base.map((entry) => {
+  return base.flatMap((entry): CatalogEntry[] => {
     const where = `content/curation.json, ${entry.id}`
     const r = records[entry.id]
-    if (!isRecord(r))
-      fail(`content/curation.json has no curation record for ${entry.id}`)
+    if (!isRecord(r)) return []
 
     const year = r.year
     if (typeof year !== 'number' || !Number.isInteger(year))
@@ -790,26 +829,28 @@ export function mergeCuration(
     if (typeof r.reviewed !== 'boolean')
       fail(`${where}: reviewed must be true or false`)
 
-    return {
-      ...entry,
-      year,
-      eraBand: eraBand as EraBand,
-      form: form as Form,
-      genres: pickList(where, 'genres', r.genres, GENRES, 1, 3),
-      moods: pickList(where, 'moods', r.moods, MOODS, 1, 3),
-      contentNotes: pickList(
-        where,
-        'contentNotes',
-        r.contentNotes,
-        CONTENT_NOTES,
-        0,
-        CONTENT_NOTES.length,
-      ),
-      hook: pickText(where, 'hook', r.hook, 20),
-      blurb: pickText(where, 'blurb', r.blurb, 60),
-      generatedBy: r.generatedBy,
-      reviewed: r.reviewed,
-    }
+    return [
+      {
+        ...entry,
+        year,
+        eraBand: eraBand as EraBand,
+        form: form as Form,
+        genres: pickList(where, 'genres', r.genres, GENRES, 1, 3),
+        moods: pickList(where, 'moods', r.moods, MOODS, 1, 3),
+        contentNotes: pickList(
+          where,
+          'contentNotes',
+          r.contentNotes,
+          CONTENT_NOTES,
+          0,
+          CONTENT_NOTES.length,
+        ),
+        hook: pickText(where, 'hook', r.hook, 20),
+        blurb: pickText(where, 'blurb', r.blurb, 60),
+        generatedBy: r.generatedBy,
+        reviewed: r.reviewed,
+      },
+    ]
   })
 }
 
@@ -855,12 +896,18 @@ export function buildCatalog(): BuildResult {
       epub = readEpub(row.file)
       epubCache.set(row.file, epub)
     }
+    // The author of the story itself: the sources.csv story_author if given (anthologies often
+    // have no author in their metadata), otherwise the EPUB's own author.
+    const author = row.story_author || epub.author
     for (const [field, value] of [
       ['title', epub.title],
-      ['author', epub.author],
+      ['author', author],
       ['language', epub.language],
     ]) {
-      if (!value) fail(`${where}: EPUB metadata has no ${field}`)
+      if (!value)
+        fail(
+          `${where}: EPUB metadata has no ${field}${field === 'author' ? ' (add story_author in sources.csv)' : ''}`,
+        )
     }
 
     const csvStart = row.story_href || null
@@ -906,7 +953,7 @@ export function buildCatalog(): BuildResult {
     base.push({
       id,
       title: row.story_title,
-      author: epub.author,
+      author,
       language: epub.language,
       bookTitle: epub.title,
       isCollection,
@@ -931,8 +978,17 @@ export function buildCatalog(): BuildResult {
     if (f.endsWith('.epub') && !used.has(f))
       console.warn(`catalog: ${f} is in content/raw/ but not in sources.csv`)
   }
-  const entries = mergeCuration(base, loadCuration())
-  return { entries, rangeText, epubs }
+  const entries = mergeCuration(base, loadCuration()).filter((e) => e.reviewed)
+  const shipped = new Set(entries.map((e) => e.id))
+  const skipped = base.filter((e) => !shipped.has(e.id))
+  // Only the books of entries that ship are published.
+  const shippedNumbers = new Set(
+    entries.map((e) => /^\/texts\/pg-(\d+)\.epub$/.exec(e.textUrl)?.[1] ?? ''),
+  )
+  const shippedEpubs = new Map(
+    [...epubs].filter(([number]) => shippedNumbers.has(number)),
+  )
+  return { entries, base, skipped, rangeText, epubs: shippedEpubs }
 }
 
 function writeOutputs({ entries, epubs }: BuildResult): void {
@@ -962,8 +1018,12 @@ function main(): void {
   try {
     const result = buildCatalog()
     writeOutputs(result)
+    const held = result.skipped.length
     console.log(
-      `catalog: ${result.entries.length} entries from ${result.epubs.size} EPUBs -> public/catalog/catalog.json`,
+      `catalog: ${result.entries.length} entries from ${result.epubs.size} EPUBs -> public/catalog/catalog.json` +
+        (held > 0
+          ? ` (${held} more in sources.csv are not shipped yet: no reviewed curation record)`
+          : ''),
     )
   } catch (error) {
     console.error(

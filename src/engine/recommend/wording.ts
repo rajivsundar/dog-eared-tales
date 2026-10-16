@@ -15,6 +15,12 @@ const NOUN_GENRES: Record<string, { singular: string }> = {
   romance: { singular: 'romance' },
   philosophy: { singular: 'philosophical work' },
   'social criticism': { singular: 'work of social criticism' },
+  politics: { singular: 'political work' },
+  history: { singular: 'work of history' },
+  memoir: { singular: 'memoir' },
+  spirituality: { singular: 'spiritual work' },
+  'self-help': { singular: 'self-help book' },
+  science: { singular: 'science writing' },
 }
 
 const isEssay = (form: Form | undefined): boolean => form === 'essay'

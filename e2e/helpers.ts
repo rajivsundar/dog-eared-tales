@@ -1,4 +1,13 @@
-import { type Page, expect } from '@playwright/test'
+import { type APIRequestContext, type Page, expect } from '@playwright/test'
+
+/** How many entries the built catalog ships (read from the catalog the app serves). */
+export async function shippedCount(
+  request: APIRequestContext,
+): Promise<number> {
+  const response = await request.get('/catalog/catalog.json')
+  const file = (await response.json()) as { entries: unknown[] }
+  return file.entries.length
+}
 
 /** Turns one page forward in the reader and waits until the position changes. */
 export async function turnForward(page: Page): Promise<void> {
