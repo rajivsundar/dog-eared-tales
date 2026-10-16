@@ -19,16 +19,92 @@ import { strFromU8, unzipSync } from 'fflate'
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const RAW_DIR = path.join(ROOT, 'content', 'raw')
 const SOURCES_CSV = path.join(ROOT, 'content', 'sources.csv')
+const CURATION_JSON = path.join(ROOT, 'content', 'curation.json')
 const OUT_CATALOG = path.join(ROOT, 'public', 'catalog')
 const OUT_TEXTS = path.join(ROOT, 'public', 'texts')
 const OUT_COVERS = path.join(ROOT, 'public', 'covers')
 
-const WORDS_PER_MINUTE = 230
+const WORDS_PER_MINUTE = 238
 const LICENSE = 'Project Gutenberg License'
 
 export type LengthClass = 'under10' | '10to30' | '30to60' | '60plus'
 
-export interface CatalogEntry {
+export const GENRES = [
+  'horror',
+  'mystery',
+  'ghost story',
+  'satire',
+  'humour',
+  'romance',
+  'adventure',
+  'science fiction',
+  'literary',
+  'philosophy',
+  'social criticism',
+] as const
+export const MOODS = [
+  'cozy',
+  'eerie',
+  'funny',
+  'romantic',
+  'thoughtful',
+  'adventurous',
+  'melancholy',
+  'uplifting',
+  'tense',
+  'whimsical',
+  'dark',
+  'hopeful',
+] as const
+export const CONTENT_NOTES = [
+  'death',
+  'grief',
+  'violence',
+  'suicide',
+  'illness',
+  'cruelty',
+  'racism',
+  'animal harm',
+  'mental illness',
+] as const
+export const ERA_BANDS = [
+  'pre-1800',
+  '1800-1849',
+  '1850-1899',
+  '1900-1930',
+] as const
+export const FORMS = ['story', 'novelette', 'novella', 'essay'] as const
+
+export type Genre = (typeof GENRES)[number]
+export type Mood = (typeof MOODS)[number]
+export type ContentNote = (typeof CONTENT_NOTES)[number]
+export type EraBand = (typeof ERA_BANDS)[number]
+export type Form = (typeof FORMS)[number]
+export type ReadingBand = 'easy' | 'medium' | 'challenging'
+
+export interface ReadingLevel {
+  /** Flesch-Kincaid grade of the story's own text, rounded to a whole number. */
+  grade: number
+  band: ReadingBand
+}
+
+/** What content/curation.json holds for each entry. */
+export interface Curation {
+  year: number
+  eraBand: EraBand
+  form: Form
+  genres: Genre[]
+  moods: Mood[]
+  contentNotes: ContentNote[]
+  /** 20 words or fewer. */
+  hook: string
+  /** 60 words or fewer. */
+  blurb: string
+  generatedBy: string
+  reviewed: boolean
+}
+
+export interface CatalogEntry extends Curation {
   id: string
   title: string
   author: string
@@ -39,6 +115,7 @@ export interface CatalogEntry {
   wordCount: number
   readingMinutes: number
   lengthClass: LengthClass
+  readingLevel: ReadingLevel
   firstLine: string
   textUrl: string
   coverUrl: string
@@ -51,6 +128,8 @@ export interface CatalogEntry {
   sourceUrl: string
   license: string
 }
+
+export type BaseEntry = Omit<CatalogEntry, keyof Curation>
 
 export interface BuildResult {
   entries: CatalogEntry[]
@@ -340,6 +419,69 @@ export function lengthClassFor(minutes: number): LengthClass {
   return '60plus'
 }
 
+/** A rough English syllable count. Good enough for a reading grade, and always the same answer. */
+export function countSyllables(word: string): number {
+  const parts = word
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/['\u2019]/g, '')
+    .split('-')
+  let total = 0
+  for (const part of parts) {
+    const w = part.replace(/[^a-z]/g, '')
+    if (w === '') continue
+    if (w.length <= 3) {
+      total += 1
+      continue
+    }
+    const stem = w
+      .replace(/(?:[^laeiouy]es|ed|[^laeiouy]e)$/, '')
+      .replace(/^y/, '')
+    total += stem.match(/[aeiouy]{1,2}/g)?.length ?? 1
+  }
+  return Math.max(1, total)
+}
+
+/** Sentences end at . ! ? or an ellipsis. Abbreviations, initials and numbers like 1.87 do not end one. */
+export function countSentences(text: string): number {
+  const flat = text.replace(/\.(?:\s*\.)+/g, '\u2026')
+  let count = 0
+  for (const m of flat.matchAll(/[.!?\u2026]+/g)) {
+    const at = m.index
+    if (m[0] === '.') {
+      const word =
+        /([A-Za-z]+)$/.exec(flat.slice(Math.max(0, at - 12), at))?.[1] ?? ''
+      if (ABBREVIATIONS.has(word.toLowerCase()) || /^[A-Z]$/.test(word))
+        continue
+    }
+    const next = flat[at + m[0].length]
+    if (next !== undefined && /[a-z0-9]/.test(next)) continue
+    count++
+  }
+  return Math.max(1, count)
+}
+
+export function readingBandFor(grade: number): ReadingBand {
+  if (grade <= 6) return 'easy'
+  if (grade <= 10) return 'medium'
+  return 'challenging'
+}
+
+/** Flesch-Kincaid grade level: 0.39 x words per sentence + 11.8 x syllables per word - 15.59. */
+export function readingLevelFor(text: string): ReadingLevel {
+  const words = text.match(WORD) ?? []
+  if (words.length === 0)
+    fail('cannot work out a reading level: the text has no words')
+  const syllables = words.reduce((sum, w) => sum + countSyllables(w), 0)
+  const raw =
+    0.39 * (words.length / countSentences(text)) +
+    11.8 * (syllables / words.length) -
+    15.59
+  const grade = Math.max(0, Math.round(raw))
+  return { grade, band: readingBandFor(grade) }
+}
+
 const ABBREVIATIONS = new Set([
   'mr',
   'mrs',
@@ -481,6 +623,149 @@ export function coverSvg(title: string, author: string): string {
   )
 }
 
+// ---------------------------------------------------------------- curation
+
+export function eraBandFor(year: number): EraBand | undefined {
+  if (year < 1800) return 'pre-1800'
+  if (year < 1850) return '1800-1849'
+  if (year < 1900) return '1850-1899'
+  if (year <= 1930) return '1900-1930'
+  return undefined
+}
+
+/** Fiction under 7,500 words is a story, 7,500 to 17,499 a novelette, 17,500 and over a novella. */
+export function formForWordCount(words: number): Exclude<Form, 'essay'> {
+  if (words < 7500) return 'story'
+  if (words < 17500) return 'novelette'
+  return 'novella'
+}
+
+export function loadCuration(): unknown {
+  if (!existsSync(CURATION_JSON)) fail('content/curation.json not found')
+  try {
+    return JSON.parse(readFileSync(CURATION_JSON, 'utf8'))
+  } catch (error) {
+    fail(
+      `content/curation.json is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+    )
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function pickList<T extends string>(
+  where: string,
+  name: string,
+  value: unknown,
+  allowed: readonly T[],
+  min: number,
+  max: number,
+): T[] {
+  if (!Array.isArray(value)) fail(`${where}: ${name} must be a list`)
+  if (value.length < min || value.length > max) {
+    fail(
+      `${where}: ${name} needs ${min === max ? min : `${min} to ${max}`} item${max === 1 ? '' : 's'}, found ${value.length}`,
+    )
+  }
+  for (const item of value) {
+    if (
+      typeof item !== 'string' ||
+      !(allowed as readonly string[]).includes(item)
+    ) {
+      fail(`${where}: "${String(item)}" is not an allowed ${name} value`)
+    }
+  }
+  if (new Set(value).size !== value.length)
+    fail(`${where}: ${name} has a repeated value`)
+  return value as T[]
+}
+
+function pickText(
+  where: string,
+  name: string,
+  value: unknown,
+  maxWords: number,
+): string {
+  if (typeof value !== 'string' || value.trim() === '')
+    fail(`${where}: ${name} is missing`)
+  const n = countWords(value)
+  if (n > maxWords)
+    fail(`${where}: ${name} has ${n} words, the limit is ${maxWords}`)
+  return value
+}
+
+/** Adds each entry's curation record. Stops if an entry has none, or a record is invalid or unused. */
+export function mergeCuration(
+  base: BaseEntry[],
+  file: unknown,
+): CatalogEntry[] {
+  if (!isRecord(file) || !isRecord(file.entries)) {
+    fail(
+      'content/curation.json must look like { "schemaVersion": 1, "entries": { "<id>": { ... } } }',
+    )
+  }
+  const records = file.entries
+  const known = new Set(base.map((e) => e.id))
+  for (const id of Object.keys(records)) {
+    if (!known.has(id))
+      fail(
+        `content/curation.json has a record for ${id}, which is not a catalog entry`,
+      )
+  }
+  return base.map((entry) => {
+    const where = `content/curation.json, ${entry.id}`
+    const r = records[entry.id]
+    if (!isRecord(r))
+      fail(`content/curation.json has no curation record for ${entry.id}`)
+
+    const year = r.year
+    if (typeof year !== 'number' || !Number.isInteger(year))
+      fail(`${where}: year must be a whole number`)
+    const eraBand = r.eraBand
+    if (!(ERA_BANDS as readonly unknown[]).includes(eraBand))
+      fail(`${where}: eraBand is missing or not allowed`)
+    if (eraBandFor(year) !== eraBand)
+      fail(`${where}: year ${year} is not in the era band ${String(eraBand)}`)
+
+    const form = r.form
+    if (!(FORMS as readonly unknown[]).includes(form))
+      fail(`${where}: form is missing or not allowed`)
+    if (form !== 'essay' && form !== formForWordCount(entry.wordCount)) {
+      fail(
+        `${where}: fiction of ${entry.wordCount} words is a ${formForWordCount(entry.wordCount)}, not a ${String(form)}`,
+      )
+    }
+
+    if (typeof r.generatedBy !== 'string' || r.generatedBy === '')
+      fail(`${where}: generatedBy is missing`)
+    if (typeof r.reviewed !== 'boolean')
+      fail(`${where}: reviewed must be true or false`)
+
+    return {
+      ...entry,
+      year,
+      eraBand: eraBand as EraBand,
+      form: form as Form,
+      genres: pickList(where, 'genres', r.genres, GENRES, 1, 3),
+      moods: pickList(where, 'moods', r.moods, MOODS, 1, 3),
+      contentNotes: pickList(
+        where,
+        'contentNotes',
+        r.contentNotes,
+        CONTENT_NOTES,
+        0,
+        CONTENT_NOTES.length,
+      ),
+      hook: pickText(where, 'hook', r.hook, 20),
+      blurb: pickText(where, 'blurb', r.blurb, 60),
+      generatedBy: r.generatedBy,
+      reviewed: r.reviewed,
+    }
+  })
+}
+
 // ---------------------------------------------------------------- build
 
 const REQUIRED_CSV = ['file', 'story_title', 'source', 'source_url']
@@ -493,7 +778,7 @@ export function buildCatalog(): BuildResult {
   const epubCache = new Map<string, Epub>()
   const epubs = new Map<string, string>()
   const hashes = new Map<string, string>()
-  const entries: CatalogEntry[] = []
+  const base: BaseEntry[] = []
   const rangeText: Record<string, string> = {}
   const ids = new Set<string>()
 
@@ -550,6 +835,11 @@ export function buildCatalog(): BuildResult {
     if (header) marked = marked.slice(header.index + header[0].length)
     const footer = /\*\*\* END OF [^\n]*?\*\*\*/.exec(marked)
     if (footer) marked = marked.slice(0, footer.index)
+    const tail = /\n\s*End of (?:the )?Project Gutenberg/i.exec(marked)
+    if (tail) marked = marked.slice(0, tail.index)
+    const notes = /\n\s*Transcriber['\u2019]s Notes?\s*\n/i.exec(marked)
+    if (notes && notes.index > marked.length * 0.8)
+      marked = marked.slice(0, notes.index)
     const text = marked.split('\u0001').join('')
 
     const id = `pg-${number}-${slugify(row.story_title)}`
@@ -562,7 +852,7 @@ export function buildCatalog(): BuildResult {
     if (!firstLine) fail(`${where}: could not find a first sentence`)
     rangeText[id] = text
 
-    entries.push({
+    base.push({
       id,
       title: row.story_title,
       author: epub.author,
@@ -572,6 +862,7 @@ export function buildCatalog(): BuildResult {
       wordCount: words,
       readingMinutes: Math.max(1, Math.round(minutes)),
       lengthClass: lengthClassFor(minutes),
+      readingLevel: readingLevelFor(text),
       firstLine,
       textUrl: `/texts/pg-${number}.epub`,
       coverUrl: `/covers/${id}.svg`,
@@ -589,6 +880,7 @@ export function buildCatalog(): BuildResult {
     if (f.endsWith('.epub') && !used.has(f))
       console.warn(`catalog: ${f} is in content/raw/ but not in sources.csv`)
   }
+  const entries = mergeCuration(base, loadCuration())
   return { entries, rangeText, epubs }
 }
 

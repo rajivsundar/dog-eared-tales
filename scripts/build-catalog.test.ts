@@ -1,14 +1,28 @@
 // @vitest-environment node
 import { beforeAll, describe, expect, it } from 'vitest'
 import {
+  type BaseEntry,
   type BuildResult,
+  type CatalogEntry,
+  CONTENT_NOTES,
+  FORMS,
+  GENRES,
+  MOODS,
   buildCatalog,
+  countSentences,
+  countSyllables,
+  countWords,
   coverSvg,
+  eraBandFor,
   findFirstLine,
   firstSentence,
+  formForWordCount,
   lengthClassFor,
   locate,
+  mergeCuration,
   parseCsv,
+  readingBandFor,
+  readingLevelFor,
   slugify,
 } from './build-catalog.ts'
 
@@ -58,6 +72,17 @@ const FIELDS = [
   'wordCount',
   'readingMinutes',
   'lengthClass',
+  'readingLevel',
+  'year',
+  'eraBand',
+  'form',
+  'genres',
+  'moods',
+  'contentNotes',
+  'hook',
+  'blurb',
+  'generatedBy',
+  'reviewed',
   'firstLine',
   'textUrl',
   'coverUrl',
@@ -138,7 +163,7 @@ describe('catalog entries', () => {
 
   it('computes length classes from the unrounded reading time', () => {
     for (const e of result.entries) {
-      expect(e.lengthClass, e.id).toBe(lengthClassFor(e.wordCount / 230))
+      expect(e.lengthClass, e.id).toBe(lengthClassFor(e.wordCount / 238))
     }
   })
 })
@@ -199,5 +224,215 @@ describe('helpers', () => {
     const svg = coverSvg('Tom & Jerry <1>', 'A. Author')
     expect(svg).toContain('Tom &amp; Jerry &lt;1&gt;')
     expect(svg).toContain('A. Author')
+  })
+})
+
+const ESSAYS = new Set([
+  'pg-71-on-the-duty-of-civil-disobedience',
+  'pg-1080-a-modest-proposal',
+  'pg-2944-compensation',
+  'pg-3172-fenimore-coopers-literary-offences',
+  'pg-16643-self-reliance',
+])
+
+const CURATION_KEYS = [
+  'year',
+  'eraBand',
+  'form',
+  'genres',
+  'moods',
+  'contentNotes',
+  'hook',
+  'blurb',
+  'generatedBy',
+  'reviewed',
+] as const
+
+function splitEntry(entry: CatalogEntry): {
+  base: BaseEntry
+  record: Record<string, unknown>
+} {
+  const base: Record<string, unknown> = { ...entry }
+  const record: Record<string, unknown> = {}
+  for (const key of CURATION_KEYS) {
+    record[key] = base[key]
+    delete base[key]
+  }
+  return { base: base as unknown as BaseEntry, record }
+}
+
+describe('curation in the catalog', () => {
+  it('has complete, valid curation on every entry', () => {
+    for (const e of result.entries) {
+      expect(e.year, e.id).toBeGreaterThan(1500)
+      expect(eraBandFor(e.year), e.id).toBe(e.eraBand)
+      expect(FORMS, e.id).toContain(e.form)
+      expect(e.genres.length, e.id).toBeGreaterThanOrEqual(1)
+      expect(e.genres.length, e.id).toBeLessThanOrEqual(3)
+      expect(e.moods.length, e.id).toBeGreaterThanOrEqual(1)
+      expect(e.moods.length, e.id).toBeLessThanOrEqual(3)
+      for (const g of e.genres) expect(GENRES).toContain(g)
+      for (const m of e.moods) expect(MOODS).toContain(m)
+      for (const n of e.contentNotes) expect(CONTENT_NOTES).toContain(n)
+      expect(countWords(e.hook), e.id).toBeLessThanOrEqual(20)
+      expect(countWords(e.blurb), e.id).toBeLessThanOrEqual(60)
+      expect(e.generatedBy, e.id).toBeTruthy()
+      expect(typeof e.reviewed, e.id).toBe('boolean')
+    }
+  })
+
+  it('uses the form rule: fiction by word count, non-fiction as essay', () => {
+    for (const e of result.entries) {
+      if (ESSAYS.has(e.id)) {
+        expect(e.form, e.id).toBe('essay')
+      } else {
+        expect(e.form, e.id).toBe(formForWordCount(e.wordCount))
+      }
+    }
+    expect(formForWordCount(7499)).toBe('story')
+    expect(formForWordCount(7500)).toBe('novelette')
+    expect(formForWordCount(17499)).toBe('novelette')
+    expect(formForWordCount(17500)).toBe('novella')
+  })
+
+  it('never copies six or more words in a row from the story into a hook or blurb', () => {
+    const words = (s: string): string[] =>
+      (
+        s.match(
+          /[A-Za-z0-9\u00C0-\uFFFF]+(?:['\u2019-][A-Za-z0-9\u00C0-\uFFFF]+)*/g,
+        ) ?? []
+      ).map((w) => w.toLowerCase().replace(/\u2019/g, "'"))
+    for (const e of result.entries) {
+      const text = words(result.rangeText[e.id])
+      const grams = new Set<string>()
+      for (let i = 0; i + 6 <= text.length; i++)
+        grams.add(text.slice(i, i + 6).join(' '))
+      for (const label of ['hook', 'blurb'] as const) {
+        const mine = words(e[label])
+        for (let i = 0; i + 6 <= mine.length; i++) {
+          expect(
+            grams.has(mine.slice(i, i + 6).join(' ')),
+            `${e.id} ${label}`,
+          ).toBe(false)
+        }
+      }
+    }
+  })
+})
+
+describe('mergeCuration', () => {
+  const sample = (): { base: BaseEntry; record: Record<string, unknown> } =>
+    splitEntry(result.entries[0])
+  const withRecord = (
+    record: Record<string, unknown>,
+    base = sample().base,
+  ): unknown[] => [base, { schemaVersion: 1, entries: { [base.id]: record } }]
+
+  it('accepts a good record', () => {
+    const { base, record } = sample()
+    const merged = mergeCuration([base], {
+      schemaVersion: 1,
+      entries: { [base.id]: record },
+    })
+    expect(merged[0].hook).toBe(record.hook)
+  })
+
+  it('stops when an entry has no curation record', () => {
+    const { base } = sample()
+    expect(() =>
+      mergeCuration([base], { schemaVersion: 1, entries: {} }),
+    ).toThrow(/no curation record/)
+  })
+
+  it('stops when a record belongs to no catalog entry', () => {
+    const { base, record } = sample()
+    const file = {
+      schemaVersion: 1,
+      entries: { [base.id]: record, 'pg-0-ghost': record },
+    }
+    expect(() => mergeCuration([base], file)).toThrow(/not a catalog entry/)
+  })
+
+  it('rejects values outside the lists and limits', () => {
+    const { base, record } = sample()
+    const bad = (change: Record<string, unknown>) => {
+      const [b, file] = withRecord({ ...record, ...change }, base)
+      return () => mergeCuration([b as BaseEntry], file)
+    }
+    expect(bad({ genres: ['cooking'] })).toThrow(/not an allowed genres/)
+    expect(bad({ genres: [] })).toThrow(/genres needs 1 to 3/)
+    expect(bad({ moods: ['cozy', 'eerie', 'funny', 'dark'] })).toThrow(
+      /moods needs 1 to 3/,
+    )
+    expect(bad({ contentNotes: ['boredom'] })).toThrow(
+      /not an allowed contentNotes/,
+    )
+    expect(bad({ hook: 'word '.repeat(21) })).toThrow(/hook has 21 words/)
+    expect(bad({ blurb: 'word '.repeat(61) })).toThrow(/blurb has 61 words/)
+    expect(bad({ blurb: '' })).toThrow(/blurb is missing/)
+    expect(bad({ reviewed: 'no' })).toThrow(/reviewed must be/)
+    expect(bad({ generatedBy: '' })).toThrow(/generatedBy is missing/)
+  })
+
+  it('rejects a year outside its era band and a form that breaks the word rule', () => {
+    const { base, record } = sample()
+    const bad = (change: Record<string, unknown>) => {
+      const [b, file] = withRecord({ ...record, ...change }, base)
+      return () => mergeCuration([b as BaseEntry], file)
+    }
+    expect(bad({ year: 1700, eraBand: '1850-1899' })).toThrow(
+      /not in the era band/,
+    )
+    expect(bad({ year: 1950, eraBand: '1900-1930' })).toThrow(
+      /not in the era band/,
+    )
+    const wrong = base.wordCount < 7500 ? 'novella' : 'story'
+    expect(bad({ form: wrong })).toThrow(/is a/)
+  })
+})
+
+describe('reading level', () => {
+  it('sorts grades into bands', () => {
+    expect(readingBandFor(0)).toBe('easy')
+    expect(readingBandFor(6)).toBe('easy')
+    expect(readingBandFor(7)).toBe('medium')
+    expect(readingBandFor(10)).toBe('medium')
+    expect(readingBandFor(11)).toBe('challenging')
+  })
+
+  it('counts syllables and sentences', () => {
+    expect(countSyllables('cat')).toBe(1)
+    expect(countSyllables('water')).toBe(2)
+    expect(countSyllables('little')).toBe(2)
+    expect(countSyllables('family')).toBe(3)
+    expect(countSyllables('well-known')).toBe(2)
+    expect(
+      countSentences(
+        'Mr. Holmes sat down. He spoke! Why? Because $1.87 was left...',
+      ),
+    ).toBe(4)
+  })
+
+  it('works out the Flesch-Kincaid grade from the text', () => {
+    const plain =
+      'The cat sat on the mat. The dog ran to the man. It was a fun day.'
+    expect(readingLevelFor(plain)).toEqual({ grade: 0, band: 'easy' })
+    const dense =
+      'Notwithstanding considerable institutional resistance, the administration systematically ' +
+      'reconsidered its fundamental philosophical assumptions concerning governmental responsibility.'
+    expect(readingLevelFor(dense).band).toBe('challenging')
+  })
+
+  it('gives every entry a grade and band that agree', () => {
+    for (const e of result.entries) {
+      expect(e.readingLevel.grade, e.id).toBeGreaterThanOrEqual(0)
+      expect(Number.isInteger(e.readingLevel.grade), e.id).toBe(true)
+      expect(e.readingLevel.band, e.id).toBe(
+        readingBandFor(e.readingLevel.grade),
+      )
+      expect(readingLevelFor(result.rangeText[e.id]), e.id).toEqual(
+        e.readingLevel,
+      )
+    }
   })
 })
