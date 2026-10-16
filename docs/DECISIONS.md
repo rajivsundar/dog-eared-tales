@@ -5,6 +5,7 @@ Dated 2026-10-15.
 - **Build process:** one assistant (Claude Code in VS Code), step-by-step prompts. No agent crew, Antigravity, gates (G0–G5, C1, C2) or Content Factory agents.
 - **Code hosting:** private GitHub repo rajivsundar/twice-told; CI is GitHub Actions. No Gitea or Gitea Actions.
 - **Deployment:** Cloudflare Workers static assets via `wrangler deploy`, replacing Cloudflare Pages Direct Upload (D10, EN-1203).
+- **Hosting (temporary):** twicetold.netlify.app is a preview with auto-deploys stopped; deploy manually only. Phase 8 moves production to Cloudflare Workers static assets as planned.
 - **Branching:** work on `main`, with optional pull requests; no dev/test branches yet.
 - **Catalog:** a hand-picked starter catalog of 28 entries from 24 unchanged Project Gutenberg EPUBs, defined in `content/sources.csv`. Stories inside collections are href ranges in the original file, not split files. The harvester (EN-202) and Standard Ebooks feeds are deferred.
 - **Covers:** simple generated SVG covers for now; AI cover art is deferred.
