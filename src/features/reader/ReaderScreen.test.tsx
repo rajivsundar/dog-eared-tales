@@ -641,3 +641,52 @@ describe('reading sessions', () => {
     )
   })
 })
+
+describe('opening a book that is not stored while offline', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it('shows a friendly message and a Back to Your Shortlist button, not the error page', async () => {
+    h.failOpen.value = true
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    render(
+      <MemoryRouter initialEntries={[`/read/${entry.id}`]}>
+        <Routes>
+          <Route path="/" element={<p>HOME PAGE</p>} />
+          <Route path="/read/:id" element={<ReaderScreen />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    const message = await screen.findByTestId('offline-message')
+    expect(message).toHaveTextContent(
+      'This story isn’t saved for offline yet. Connect once and it will be.',
+    )
+    expect(screen.getByTestId('reader')).toHaveAttribute(
+      'data-phase',
+      'offline',
+    )
+    expect(
+      screen.queryByText('Something went wrong opening this story.'),
+    ).not.toBeInTheDocument()
+    fireEvent.click(
+      screen.getByRole('link', { name: 'Back to Your Shortlist' }),
+    )
+    expect(await screen.findByText('HOME PAGE')).toBeInTheDocument()
+  })
+
+  it('still shows the error page for a failure while online', async () => {
+    h.failOpen.value = true
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    render(
+      <MemoryRouter initialEntries={[`/read/${entry.id}`]}>
+        <Routes>
+          <Route path="/read/:id" element={<ReaderScreen />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    expect(
+      await screen.findByText('Something went wrong opening this story.'),
+    ).toBeInTheDocument()
+    expect(screen.queryByTestId('offline-message')).not.toBeInTheDocument()
+    error.mockRestore()
+  })
+})

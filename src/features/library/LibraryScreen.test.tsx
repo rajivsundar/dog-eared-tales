@@ -1,7 +1,16 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetCatalogCache } from '../../catalog'
+import { fakeCacheStorage } from '../../pwa/fakeCaches'
+import { TEXTS_CACHE } from '../../pwa/textCache'
 import { fakeCatalog, fakeStores } from '../shortlist/fakeStores'
 import LibraryScreen from './LibraryScreen'
 
@@ -30,6 +39,7 @@ vi.mock('../../stores', () => {
     eventLog: delegate('eventLog'),
     libraryStore: delegate('libraryStore'),
     progressStore: delegate('progressStore'),
+    settingsStore: delegate('settingsStore'),
   }
 })
 
@@ -266,5 +276,80 @@ describe('Rate it', () => {
     expect(stores.events.filter((e) => e.type === 'notForMe')).toEqual([
       expect.objectContaining({ workId: 'story-2', reason: 'too-dark' }),
     ])
+  })
+})
+
+describe('offline icons in the Library', () => {
+  beforeEach(() => {
+    // The catalog stub gives every story an empty textUrl, so give each its own file.
+    resetCatalogCache()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: RequestInfo | URL) =>
+        // Book files cannot be fetched here, so only the ones stored below show the icon.
+        String(url).includes('catalog.json')
+          ? {
+              ok: true,
+              status: 200,
+              json: async () => ({
+                schemaVersion: 1,
+                entries: fakeCatalog().map((e, i) => ({
+                  ...e,
+                  wordCount: 2380,
+                  textUrl: `/texts/pg-${i}.epub`,
+                })),
+              }),
+            }
+          : new Response('no', { status: 404 }),
+      ),
+    )
+    // Only story-1 and story-3 are stored.
+    vi.stubGlobal(
+      'caches',
+      fakeCacheStorage({
+        [TEXTS_CACHE]: ['/texts/pg-1.epub', '/texts/pg-3.epub'],
+      }).storage,
+    )
+  })
+  afterEach(() => vi.unstubAllGlobals())
+
+  const icons = (card: HTMLElement) =>
+    within(card).queryAllByRole('img', { name: 'Available offline' })
+
+  it('marks Reading, Dog-eared and Finished works that are stored', async () => {
+    await stores.progressStore.set({
+      workId: 'story-1',
+      locator: 'x',
+      percent: 40,
+      secondsRead: 30,
+    })
+    await stores.progressStore.set({
+      workId: 'story-2',
+      locator: 'x',
+      percent: 40,
+      secondsRead: 30,
+    })
+    await stores.libraryStore.save('story-3')
+    await stores.libraryStore.save('story-4')
+    await stores.eventLog.append({
+      workId: 'story-1',
+      type: 'finished',
+      at: Date.now() + 60_000,
+    })
+
+    // Reading: story-2 is not stored.
+    renderLibrary()
+    const reading = await screen.findByText('Story 2')
+    expect(icons(reading.closest('li')!)).toHaveLength(0)
+
+    fireEvent.click(tab('Dog-eared'))
+    const stored = (await screen.findByText('Story 3')).closest('li')!
+    const notStored = screen.getByText('Story 4').closest('li')!
+    await waitFor(() => expect(icons(stored)).toHaveLength(1))
+    expect(icons(notStored)).toHaveLength(0)
+
+    fireEvent.click(tab('Finished'))
+    const finished = (await screen.findByText('Story 1')).closest('li')!
+    await waitFor(() => expect(icons(finished)).toHaveLength(1))
   })
 })

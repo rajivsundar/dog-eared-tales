@@ -10,6 +10,8 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetCatalogCache } from '../../catalog'
 import HomePage from '../../app/HomePage'
+import { fakeCacheStorage } from '../../pwa/fakeCaches'
+import { TEXTS_CACHE } from '../../pwa/textCache'
 import { fakeCatalog, fakeStores } from './fakeStores'
 
 // The screen uses these stores; the tests give it in-memory ones.
@@ -464,5 +466,162 @@ describe('Your Long List', () => {
     await screen.findByRole('heading', { name: 'Your Long List' })
     const shown = stores.events.filter((e) => e.type === 'shown')
     expect(shown).toHaveLength(6 + n)
+  })
+})
+
+describe('offline books', () => {
+  const epub = (i: number) => `/texts/pg-${i}.epub`
+  function stubOffline(
+    options: { cached?: number[]; textsFail?: boolean } = {},
+  ) {
+    resetCatalogCache()
+    const fake = fakeCacheStorage({
+      [TEXTS_CACHE]: (options.cached ?? []).map(epub),
+    })
+    vi.stubGlobal('caches', fake.storage)
+    const fetchMock = vi.fn(async (url: RequestInfo | URL) => {
+      if (String(url).includes('catalog.json')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            schemaVersion: 1,
+            entries: Array.from({ length: 24 }, (_, i) => ({
+              ...fakeCatalog()[i % 10],
+              id: `story-${i}`,
+              title: `Story ${i}`,
+              textUrl: epub(i),
+              form: i < 3 ? 'story' : i % 2 === 0 ? 'novella' : 'novelette',
+              lengthClass: i < 3 ? 'under10' : '60plus',
+              readingMinutes: i < 3 ? 8 : 60,
+            })),
+          }),
+        }
+      }
+      return options.textsFail
+        ? new Response('no', { status: 404 })
+        : new Response('book', { status: 200 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const textFetches = () =>
+      fetchMock.mock.calls
+        .map(([u]) => String(u))
+        .filter((u) => u.startsWith('/texts/'))
+    return { fake, textFetches }
+  }
+  const numberOf = (li: HTMLElement) =>
+    Number(li.textContent?.match(/Story (\d+)/)?.[1])
+  const rateThree = async () => {
+    for (const id of ['story-0', 'story-1', 'story-2']) {
+      await stores.eventLog.append({ workId: id, type: 'finished' })
+      await stores.eventLog.append({ workId: id, type: 'love' })
+    }
+  }
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('quietly stores the book of every pick on both lists, each file once', async () => {
+    const { fake, textFetches } = stubOffline()
+    await rateThree()
+    renderHome()
+    await screen.findByRole('heading', { name: 'Your Long List' })
+    const titles = screen.getAllByRole('listitem').map((li) => numberOf(li))
+    await waitFor(() => expect(textFetches().length).toBe(new Set(titles).size))
+    expect(new Set(textFetches())).toEqual(new Set(titles.map(epub)))
+    expect(textFetches()).toHaveLength(new Set(textFetches()).size)
+    await waitFor(() =>
+      expect(new Set(fake.paths(TEXTS_CACHE))).toEqual(
+        new Set(titles.map(epub)),
+      ),
+    )
+  })
+
+  it('also stores Dog-eared works and works under Reading', async () => {
+    const { fake } = stubOffline()
+    await stores.libraryStore.save('story-20')
+    await stores.progressStore.set({
+      workId: 'story-21',
+      locator: 'x',
+      percent: 30,
+      secondsRead: 60,
+    })
+    renderHome()
+    await screen.findAllByRole('listitem')
+    await waitFor(() => {
+      expect(fake.paths(TEXTS_CACHE)).toContain(epub(20))
+      expect(fake.paths(TEXTS_CACHE)).toContain(epub(21))
+    })
+  })
+
+  it('shows an Available offline icon only on cards whose book is stored', async () => {
+    // Only the even-numbered books are stored; the others cannot be fetched.
+    stubOffline({
+      cached: Array.from({ length: 12 }, (_, i) => i * 2),
+      textsFail: true,
+    })
+    renderHome()
+    const cards = await screen.findAllByRole('listitem')
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole('img', { name: 'Available offline' }).length,
+      ).toBeGreaterThan(0),
+    )
+    for (const card of cards) {
+      const stored = numberOf(card) % 2 === 0
+      expect(
+        within(card).queryAllByRole('img', { name: 'Available offline' }),
+        card.textContent ?? '',
+      ).toHaveLength(stored ? 1 : 0)
+    }
+  })
+
+  it('shows no icon when nothing is stored', async () => {
+    const { textFetches } = stubOffline()
+    // Offline, so nothing gets stored either.
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    renderHome()
+    await screen.findAllByRole('listitem')
+    expect(
+      screen.queryAllByRole('img', { name: 'Available offline' }),
+    ).toHaveLength(0)
+    expect(textFetches()).toEqual([])
+    vi.restoreAllMocks()
+  })
+
+  it('shows Available offline in the detail sheet for a stored book', async () => {
+    stubOffline({ cached: Array.from({ length: 24 }, (_, i) => i) })
+    renderHome()
+    const items = await screen.findAllByRole('listitem')
+    fireEvent.click(within(items[0]).getByRole('button'))
+    const sheet = await screen.findByRole('dialog')
+    expect(within(sheet).getByText('Available offline')).toBeInTheDocument()
+  })
+
+  it('leaves it out of the detail sheet when the book is not stored', async () => {
+    stubOffline()
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    renderHome()
+    const items = await screen.findAllByRole('listitem')
+    fireEvent.click(within(items[0]).getByRole('button'))
+    const sheet = await screen.findByRole('dialog')
+    expect(
+      within(sheet).queryByText('Available offline'),
+    ).not.toBeInTheDocument()
+    vi.restoreAllMocks()
+  })
+
+  it('shows the icon on Your Long List cards too', async () => {
+    stubOffline({ cached: Array.from({ length: 24 }, (_, i) => i) })
+    await rateThree()
+    renderHome()
+    const heading = await screen.findByRole('heading', {
+      name: 'Your Long List',
+    })
+    const cards = within(heading.closest('section')!).getAllByRole('listitem')
+    await waitFor(() =>
+      expect(
+        within(cards[0]).getByRole('img', { name: 'Available offline' }),
+      ).toBeInTheDocument(),
+    )
   })
 })

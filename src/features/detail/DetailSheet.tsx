@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { Link } from 'react-router'
+import { OfflineBadge } from '../offline/OfflineBadge'
 import type { CatalogEntry } from '../../catalog'
 import {
   bookName,
@@ -13,6 +14,8 @@ interface Props {
   reason: string
   /** The "Why this pick?" sentence. */
   why: string
+  /** Whether the book is stored for offline reading. */
+  offline?: boolean
   dogEared: boolean
   onClose: () => void
   onDogEar: () => void
@@ -29,6 +32,7 @@ export function DetailSheet({
   entry,
   reason,
   why,
+  offline = false,
   dogEared,
   onClose,
   onDogEar,
@@ -151,6 +155,14 @@ export function DetailSheet({
                 ? entry.contentNotes.join(', ')
                 : 'None noted'}
             </dd>
+            {offline && (
+              <>
+                <dt className="text-muted">Offline</dt>
+                <dd>
+                  <OfflineBadge available withLabel />
+                </dd>
+              </>
+            )}
             <dt className="text-muted">Source</dt>
             <dd>
               {entry.source} ·{' '}

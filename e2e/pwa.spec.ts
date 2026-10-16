@@ -43,6 +43,7 @@ test('the web app manifest describes the app', async ({ page, request }) => {
 test('works offline: the shell, library and a story that was opened before', async ({
   page,
   context,
+  request,
 }) => {
   await startApp(page)
   // Wait for the service worker to take over (it claims the page after the first load).
@@ -64,7 +65,7 @@ test('works offline: the shell, library and a story that was opened before', asy
   expect(precache.some((p) => p.endsWith('.woff2'))).toBe(true)
   expect(precache.some((p) => p.startsWith('/texts/'))).toBe(false)
 
-  // Opening a story puts its text in its own cache, and only that one.
+  // Opening a story puts its text in its own cache (it may already be there: Your Shortlist is saved ahead).
   await page.goto(`/read/${STORY}`)
   await expect(page.getByTestId('reader')).toHaveAttribute(
     'data-phase',
@@ -74,7 +75,9 @@ test('works offline: the shell, library and a story that was opened before', asy
     const keys = await (await caches.open('twice-told-texts')).keys()
     return keys.map((r) => new URL(r.url).pathname)
   })
-  expect(texts).toEqual(['/texts/pg-1063.epub'])
+  expect(texts).toContain('/texts/pg-1063.epub')
+  // Not every book: only the ones needed so far.
+  expect(texts.length).toBeLessThan(10)
 
   // Offline: a reload of /read/:id, and /library, still work.
   await context.setOffline(true)
@@ -92,10 +95,13 @@ test('works offline: the shell, library and a story that was opened before', asy
   await page.goto('/')
   await expect(page.getByRole('listitem').first()).toBeVisible()
 
-  // A story that was never opened is not there offline.
-  await page.goto('/read/pg-269-the-open-window')
+  // A story that was never saved is not there offline: a friendly message, not an error.
+  const catalog = (await (await request.get('/catalog/catalog.json')).json())
+    .entries as { id: string; textUrl: string }[]
+  const unsaved = catalog.find((e) => !texts.includes(e.textUrl))!
+  await page.goto(`/read/${unsaved.id}`)
   await expect(page.getByTestId('reader')).toHaveAttribute(
     'data-phase',
-    'error',
+    'offline',
   )
 })

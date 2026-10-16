@@ -1,16 +1,19 @@
 import { sittingsLabel } from '../../engine/recommend'
 import { minutesLabel } from '../detail/labels'
+import { OfflineBadge } from '../offline/OfflineBadge'
 import type { ShortlistPick } from './dailyShortlist'
 
 interface Props {
   picks: ShortlistPick[]
   /** The reader's usual sitting, in minutes. */
   sitting: number
+  /** Paths of the books stored for offline reading. */
+  cached: ReadonlySet<string>
   onOpen: (workId: string) => void
 }
 
 /** Your Long List: longer works (novelettes and novellas), shown below Your Shortlist. */
-export function LongListSection({ picks, sitting, onOpen }: Props) {
+export function LongListSection({ picks, sitting, cached, onOpen }: Props) {
   return (
     <section aria-labelledby="long-list-title" className="mt-10">
       <h2
@@ -39,9 +42,10 @@ export function LongListSection({ picks, sitting, onOpen }: Props) {
                   {entry.title}
                 </span>
                 <span className="text-sm">{entry.author}</span>
-                <span className="mt-1 text-sm text-muted">
+                <span className="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-muted">
                   {minutesLabel(entry.readingMinutes)} ·{' '}
                   {sittingsLabel(entry.readingMinutes, sitting)}
+                  <OfflineBadge available={cached.has(entry.textUrl)} />
                 </span>
                 <span className="mt-auto pt-2 text-sm font-medium text-accent">
                   {reason}

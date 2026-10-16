@@ -16,6 +16,8 @@ import { useDogEar } from '../library/useDogEar'
 import { UndoToast } from '../ui/UndoToast'
 import { DetailSheet } from '../detail/DetailSheet'
 import { minutesLabel } from '../detail/labels'
+import { OfflineBadge } from '../offline/OfflineBadge'
+import { useAutoCache, useCachedTexts } from '../offline/useOffline'
 import { LongListSection } from './LongListSection'
 import {
   type ShortlistDeps,
@@ -49,6 +51,7 @@ export function ShortlistScreen() {
   const [failed, setFailed] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
   const dogEar = useDogEar()
+  const cached = useCachedTexts()
   const [beliefs, setBeliefs] = useState<Profile['facetBeliefs']>({})
   const [removed, setRemoved] = useState<Removed | null>(null)
   const [longPicks, setLongPicks] = useState<ShortlistPick[]>([])
@@ -92,6 +95,17 @@ export function ShortlistScreen() {
       cancelled = true
     }
   }, [now])
+
+  // Keep the books for these lists (and Dog-eared and Reading works) ready for offline.
+  useAutoCache(
+    [
+      ...(picks ?? []).map((p) => p.entry.id),
+      '|',
+      ...longPicks.map((p) => p.entry.id),
+      '|',
+      ...[...dogEar.ids],
+    ].join(','),
+  )
 
   const openShort = picks?.find((p) => p.entry.id === openId)
   const openLong = longPicks.find((p) => p.entry.id === openId)
@@ -194,8 +208,9 @@ export function ShortlistScreen() {
                       {entry.title}
                     </span>
                     <span className="text-sm">{entry.author}</span>
-                    <span className="mt-1 text-sm text-muted">
+                    <span className="mt-1 flex items-center gap-2 text-sm text-muted">
                       {minutesLabel(entry.readingMinutes)}
+                      <OfflineBadge available={cached.has(entry.textUrl)} />
                     </span>
                     <span className="mt-auto pt-2 text-sm font-medium text-accent">
                       {reason}
@@ -212,6 +227,7 @@ export function ShortlistScreen() {
         <LongListSection
           picks={longPicks}
           sitting={sitting}
+          cached={cached}
           onOpen={openSheet}
         />
       )}
@@ -220,6 +236,7 @@ export function ShortlistScreen() {
         <DetailSheet
           entry={open.entry}
           reason={open.reason}
+          offline={cached.has(open.entry.textUrl)}
           why={whyThisPick(
             open.entry,
             open.reason,

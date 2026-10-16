@@ -19,7 +19,7 @@ import { EndScreen } from './EndScreen'
 import { ProgressBar } from './ProgressBar'
 import { type ProgressTracker, createProgressTracker } from './progressTracker'
 
-type Phase = 'loading' | 'ready' | 'finished' | 'missing' | 'error'
+type Phase = 'loading' | 'ready' | 'finished' | 'missing' | 'offline' | 'error'
 
 function useDeviceIsDark(): boolean {
   const query = '(prefers-color-scheme: dark)'
@@ -141,8 +141,13 @@ function Reader({ id }: { id: string }) {
         void tracker.opened()
         setPhase('ready')
       } catch (error) {
-        console.error(error)
         if (!closed) {
+          // Offline, a book that was never stored cannot be fetched: that is not an error.
+          if (typeof navigator !== 'undefined' && !navigator.onLine) {
+            setPhase('offline')
+            return
+          }
+          console.error(error)
           setErrorText(error instanceof Error ? error.message : String(error))
           setPhase('error')
         }
@@ -342,6 +347,25 @@ function Reader({ id }: { id: string }) {
           style={{ background: colors.background }}
         >
           Opening…
+        </div>
+      )}
+
+      {phase === 'offline' && (
+        <div
+          role="alert"
+          data-testid="offline-message"
+          className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-4 px-6 text-center"
+          style={{ background: colors.background }}
+        >
+          <p className="max-w-md text-xl font-semibold">
+            This story isn’t saved for offline yet. Connect once and it will be.
+          </p>
+          <Link
+            to="/"
+            className="mt-2 inline-flex min-h-11 items-center rounded-lg border-2 border-current px-5 font-semibold"
+          >
+            Back to Your Shortlist
+          </Link>
         </div>
       )}
 

@@ -12,6 +12,8 @@ import { CheckIn } from '../checkin/CheckIn'
 import { RATING_LABELS, recordRating } from '../checkin/rating'
 import type { Rating } from '../checkin/rating'
 import { minutesLabel } from '../detail/labels'
+import { OfflineBadge } from '../offline/OfflineBadge'
+import { useAutoCache, useCachedTexts } from '../offline/useOffline'
 import { UndoToast } from '../ui/UndoToast'
 import { type LibraryLists, sortLibrary } from './libraryLists'
 
@@ -56,6 +58,13 @@ export default function LibraryScreen() {
   const [failed, setFailed] = useState(false)
   const [removed, setRemoved] = useState<Removed | null>(null)
   const [rating, setRating] = useState<CatalogEntry | null>(null)
+  const cached = useCachedTexts()
+  // Dog-eared and Reading works are kept ready for offline.
+  useAutoCache(
+    lists
+      ? [...lists.dogEared, ...lists.reading].map((i) => i.entry.id).join(',')
+      : '',
+  )
   // Writes run one after another, so a quick Undo never overtakes the removal.
   const writes = useRef<Promise<unknown>>(Promise.resolve())
   const enqueue = (task: () => Promise<unknown>): void => {
@@ -193,6 +202,7 @@ export default function LibraryScreen() {
             lists={lists}
             onUnDogEar={unDogEar}
             onRate={setRating}
+            cached={cached}
           />
         )}
       </div>
@@ -225,11 +235,13 @@ function Panel({
   lists,
   onUnDogEar,
   onRate,
+  cached,
 }: {
   tab: TabId
   lists: LibraryLists
   onUnDogEar: (saved: SavedWork) => void
   onRate: (entry: CatalogEntry) => void
+  cached: ReadonlySet<string>
 }) {
   const count =
     tab === 'reading'
@@ -276,8 +288,9 @@ function Panel({
                     style={{ width: `${Math.round(percent)}%` }}
                   />
                 </span>
-                <span className="text-sm text-muted">
+                <span className="flex items-center gap-2 text-sm text-muted">
                   {minutesLeft} min left
+                  <OfflineBadge available={cached.has(entry.textUrl)} />
                 </span>
               </span>
             </Link>
@@ -294,8 +307,9 @@ function Panel({
                   {entry.title}
                 </span>
                 <span className="text-sm">{entry.author}</span>
-                <span className="text-sm text-muted">
+                <span className="flex items-center gap-2 text-sm text-muted">
                   {minutesLabel(entry.readingMinutes)}
+                  <OfflineBadge available={cached.has(entry.textUrl)} />
                 </span>
               </span>
             </Link>
@@ -320,9 +334,10 @@ function Panel({
                   {entry.title}
                 </span>
                 <span className="text-sm">{entry.author}</span>
-                <span className="text-sm text-muted">
+                <span className="flex flex-wrap items-center gap-x-2 text-sm text-muted">
                   Finished {finishDate(at)}
                   {rating && ` · ${RATING_LABELS[rating]}`}
+                  <OfflineBadge available={cached.has(entry.textUrl)} />
                 </span>
               </span>
             </Link>
