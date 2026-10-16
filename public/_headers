@@ -1,0 +1,11 @@
+# Cache rules, read by Cloudflare Workers static assets (and Netlify).
+
+# The service worker and the manifest must be re-checked every time, so updates arrive.
+/sw.js
+  Cache-Control: no-cache
+/manifest.webmanifest
+  Cache-Control: no-cache
+
+# Hashed files (JS, CSS and fonts) never change under the same name, so they can be kept for a year.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

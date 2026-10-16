@@ -1,8 +1,12 @@
 // Draws the app icons: a folded page corner on a book. Original art, made here from simple shapes.
 // Run with `npm run icons` after changing the artwork. The PNGs in public/icons/ are committed.
 import { mkdirSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { chromium } from '@playwright/test'
 
+// Paths are relative to the project folder, wherever the script is started from.
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const NIGHT = '#1b1c1f'
 const PAPER = '#fbf8f2'
 const COVER = '#8a3b12'
@@ -45,17 +49,22 @@ const outputs = [
   { file: 'public/icons/apple-touch-icon.png', size: 180, maskable: true },
 ]
 
-mkdirSync('public/icons', { recursive: true })
-writeFileSync('public/favicon.svg', svg({ maskable: false }))
+mkdirSync(path.join(ROOT, 'public', 'icons'), { recursive: true })
+writeFileSync(
+  path.join(ROOT, 'public', 'favicon.svg'),
+  svg({ maskable: false }),
+)
 
 const browser = await chromium.launch()
 try {
   for (const { file, size, maskable } of outputs) {
-    const page = await browser.newPage({ viewport: { width: size, height: size } })
+    const page = await browser.newPage({
+      viewport: { width: size, height: size },
+    })
     await page.setContent(
       `<style>html,body{margin:0;background:transparent}svg{display:block;width:${size}px;height:${size}px}</style>${svg({ maskable })}`,
     )
-    await page.screenshot({ path: file, omitBackground: true })
+    await page.screenshot({ path: path.join(ROOT, file), omitBackground: true })
     await page.close()
     console.log(`wrote ${file}`)
   }

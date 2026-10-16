@@ -13,6 +13,8 @@
     "typecheck": "tsc -b",
     "catalog": "node scripts/build-catalog.ts",
     "icons": "node scripts/make-icons.mjs",
+    "deploy": "npm run build && wrangler deploy",
+    "deploy:dry": "npm run build && wrangler deploy --dry-run",
     "predev": "npm run catalog",
     "prebuild": "npm run catalog"
   },
@@ -52,6 +54,7 @@
     "vite-plugin-pwa": "^2.0.0",
     "vitest": "^5.0.5",
     "workbox-build": "^7.4.1",
-    "workbox-window": "^7.4.1"
+    "workbox-window": "^7.4.1",
+    "wrangler": "^4.151.1"
   }
 }
