@@ -113,11 +113,7 @@ describe('catalog entries', () => {
       for (const field of FIELDS) {
         expect(entry, `${entry.id}.${field}`).toHaveProperty(field)
         const value = entry[field]
-        if (field === 'startHref' || field === 'endHref') {
-          expect(
-            value === null || (typeof value === 'string' && value !== ''),
-          ).toBe(true)
-        } else if (typeof value === 'string') {
+        if (typeof value === 'string') {
           expect(value, `${entry.id}.${field}`).not.toBe('')
         }
       }
@@ -130,14 +126,13 @@ describe('catalog entries', () => {
     }
   })
 
-  it('has both hrefs for collection entries and none for single works', () => {
+  it('has both hrefs for every entry, and single works start at their own title', () => {
     for (const e of result.entries) {
-      if (e.isCollection) {
-        expect(e.startHref, e.id).toBeTruthy()
-        expect(e.endHref, e.id).toBeTruthy()
-      } else {
-        expect(e.startHref, e.id).toBeNull()
-        expect(e.endHref, e.id).toBeNull()
+      expect(e.startHref, e.id).toMatch(/^[^#]+(#.+)?$/)
+      expect(e.endHref, e.id).toBeTruthy()
+      if (!e.isCollection) {
+        // An anchor on the title heading after the Project Gutenberg START line.
+        expect(e.startHref, e.id).toContain('#')
       }
     }
   })

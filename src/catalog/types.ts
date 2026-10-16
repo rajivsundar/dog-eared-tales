@@ -21,9 +21,9 @@ export interface CatalogEntry {
   textUrl: string
   coverUrl: string
   /** Where the story starts inside the EPUB. Null for a single work. */
-  startHref: string | null
+  startHref: string
   /** Where the next story starts, so this one ends. Null for a single work. */
-  endHref: string | null
+  endHref: string
   sha256: string
   source: string
   sourceUrl: string

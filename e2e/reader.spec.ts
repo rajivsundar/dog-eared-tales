@@ -149,6 +149,21 @@ test('a story inside a collection starts at its own title, not the book’s titl
   ).toBeVisible()
 })
 
+test('a single work opens on its title, not the Project Gutenberg front matter', async ({
+  page,
+}) => {
+  await openStory(page, 'pg-1063-the-cask-of-amontillado')
+  const text = await visibleText(page)
+  expect(text.startsWith('The Cask of Amontillado')).toBe(true)
+  expect(text).not.toContain('The Project Gutenberg eBook')
+  expect(text).not.toContain('START OF')
+
+  // The licence section is outside the story.
+  const chapter = await sectionText(page)
+  expect(chapter).toContain('The thousand injuries of Fortunato')
+  expect(chapter.toUpperCase()).not.toContain('PROJECT GUTENBERG')
+})
+
 test('reaching the end of a story shows the end screen and logs it as finished', async ({
   page,
 }) => {

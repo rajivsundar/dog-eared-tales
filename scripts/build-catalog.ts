@@ -119,10 +119,16 @@ export interface CatalogEntry extends Curation {
   firstLine: string
   textUrl: string
   coverUrl: string
-  /** Where the story starts inside the EPUB. Null for single works. */
-  startHref: string | null
-  /** Where the next story starts, so the reader knows where this one ends. Null for single works. */
-  endHref: string | null
+  /**
+   * Where the story starts inside the EPUB. For a single work, the first heading after the
+   * Project Gutenberg START line, so the licence notice is skipped.
+   */
+  startHref: string
+  /**
+   * Where the story ends. For a collection story, where the next story starts. For a single work,
+   * the Project Gutenberg licence section, which holds the END line.
+   */
+  endHref: string
   sha256: string
   source: string
   sourceUrl: string
@@ -259,7 +265,7 @@ function htmlToText(html: string, filePath: string): string {
   let last = 0
   for (const m of s.matchAll(/<(\/?)([a-zA-Z][^\s>/]*)([^>]*)>/g)) {
     out += s.slice(last, m.index)
-    last = m.index + m[0].length
+    last = (m.index ?? 0) + m[0].length
     const closing = m[1] === '/'
     const tag = m[2].toLowerCase()
     const attrs = m[3]
@@ -320,6 +326,8 @@ interface Epub {
   stream: string
   /** Index in the stream of the Project Gutenberg licence section. */
   licenseAt: number
+  /** The href of the licence section. */
+  licenseHref: string
 }
 
 function readEpub(file: string): Epub {
@@ -383,7 +391,46 @@ function readEpub(file: string): Epub {
     language: dcField(opf, 'language'),
     stream,
     licenseAt,
+    licenseHref,
   }
+}
+
+/** Letters and digits only, lower case, so "The Monkey’s Paw" matches "THE MONKEY'S PAW". */
+function titleKey(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, '')
+}
+
+/**
+ * Where a single work really begins: the first heading after the Project Gutenberg START line
+ * whose text is the work's title. If no heading carries the title, the first heading with an id.
+ * The EPUB is not changed; this only finds an existing anchor.
+ */
+export function findWorkStart(
+  epub: Pick<Epub, 'stream' | 'licenseAt'>,
+  title: string,
+  file: string,
+): string {
+  const marker = /\*\*\* START OF [^\n]*?\*\*\*/.exec(epub.stream)
+  if (!marker) fail(`${file}: no "*** START OF" line found`)
+  const region = epub.stream.slice(
+    marker.index + marker[0].length,
+    epub.licenseAt,
+  )
+  const wanted = titleKey(title)
+  const anchors = [...region.matchAll(/\0([^\0#]+#[^\0]+)\0/g)]
+  if (anchors.length === 0)
+    fail(`${file}: no heading with an id after the START line`)
+  const heading = (m: RegExpMatchArray): string =>
+    titleKey(
+      stripMarkers(
+        region.slice(
+          (m.index ?? 0) + m[0].length,
+          (m.index ?? 0) + m[0].length + 200,
+        ),
+      ),
+    )
+  const exact = anchors.find((m) => heading(m).startsWith(wanted))
+  return (exact ?? anchors[0])[1]
 }
 
 /** Finds where an href (path#id) sits in the book text. */
@@ -816,17 +863,21 @@ export function buildCatalog(): BuildResult {
       if (!value) fail(`${where}: EPUB metadata has no ${field}`)
     }
 
-    const startHref = row.story_href || null
-    const endHref = row.story_end_href || null
-    if ((startHref === null) !== (endHref === null)) {
+    const csvStart = row.story_href || null
+    const csvEnd = row.story_end_href || null
+    if ((csvStart === null) !== (csvEnd === null)) {
       fail(
         `${where}: story_href and story_end_href must both be filled or both be blank`,
       )
     }
-    const isCollection = startHref !== null
+    const isCollection = csvStart !== null
+    // A single work starts at its own title and ends where the licence section begins.
+    const startHref = csvStart ?? findWorkStart(epub, row.story_title, where)
+    const endHref = csvEnd ?? epub.licenseHref
 
-    const from = startHref ? locate(epub, startHref, where) : 0
-    const to = endHref ? locate(epub, endHref, where) : epub.licenseAt
+    // Word counts and text still run from the START line (or the story) to the licence, as before.
+    const from = csvStart ? locate(epub, csvStart, where) : 0
+    const to = locate(epub, endHref, where)
     if (to <= from)
       fail(`${where}: the end of the story comes before its start`)
     // Cut Project Gutenberg's own header and footer, which sit inside the book files.
