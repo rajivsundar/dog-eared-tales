@@ -1,18 +1,13 @@
 import { useEffect, useState } from 'react'
 import { loadCatalog } from '../../catalog'
-import {
-  eventLog,
-  libraryStore,
-  profileStore,
-  settingsStore,
-} from '../../stores'
+import { eventLog, profileStore, settingsStore } from '../../stores'
+import { useDogEar } from '../library/useDogEar'
 import { UndoToast } from '../ui/UndoToast'
 import { DetailSheet } from '../detail/DetailSheet'
 import { minutesLabel } from '../detail/labels'
 import {
   type ShortlistDeps,
   type ShortlistPick,
-  dogEar,
   loadShortlist,
   recordShown,
   recordTap,
@@ -34,7 +29,7 @@ export function ShortlistScreen() {
   const [picks, setPicks] = useState<ShortlistPick[] | null>(null)
   const [failed, setFailed] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
-  const [dogEared, setDogEared] = useState<Set<string>>(new Set())
+  const dogEar = useDogEar()
   const [removed, setRemoved] = useState<Removed | null>(null)
 
   useEffect(() => {
@@ -48,15 +43,11 @@ export function ShortlistScreen() {
           profile: profileStore,
           events: eventLog,
         }
-        const [list, saved] = await Promise.all([
-          loadShortlist(deps, now),
-          libraryStore.list(),
-        ])
+        const list = await loadShortlist(deps, now)
         if (cancelled) return
         await recordShown(deps, list, now)
         if (cancelled) return
         setCatalogDeps(deps)
-        setDogEared(new Set(saved.map((s) => s.workId)))
         setPicks(list)
       } catch (error) {
         console.error(error)
@@ -81,13 +72,14 @@ export function ShortlistScreen() {
   }
 
   const onDogEar = (id: string): void => {
-    setDogEared((prev) => new Set(prev).add(id))
-    dogEar({ events: eventLog, library: libraryStore }, id).catch(fail)
+    setRemoved(null)
+    dogEar.toggle(id)
   }
 
   const onNotForMe = (id: string): void => {
     if (!catalogDeps || !picks) return
     setOpenId(null)
+    dogEar.dismiss()
     const previous = picks
     removePick(catalogDeps, previous, id, new Date())
       .then(async ({ picks: next, replacement }) => {
@@ -166,14 +158,21 @@ export function ShortlistScreen() {
         <DetailSheet
           entry={open.entry}
           reason={open.reason}
-          dogEared={dogEared.has(open.entry.id)}
+          dogEared={dogEar.ids.has(open.entry.id)}
           onClose={() => setOpenId(null)}
           onDogEar={() => onDogEar(open.entry.id)}
           onNotForMe={() => onNotForMe(open.entry.id)}
         />
       )}
 
-      {removed && (
+      {dogEar.removed && (
+        <UndoToast
+          key={dogEar.removed.key}
+          onUndo={dogEar.undo}
+          onExpire={dogEar.dismiss}
+        />
+      )}
+      {removed && !dogEar.removed && (
         <UndoToast
           key={removed.key}
           onUndo={onUndo}

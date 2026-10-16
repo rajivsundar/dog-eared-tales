@@ -39,6 +39,12 @@ const h = vi.hoisted(() => {
     engines: [] as InstanceType<typeof FakeEngine>[],
     progressStore: { get: vi.fn(), set: vi.fn(async (p: unknown) => p) },
     eventLog: { append: vi.fn(async (e: unknown) => e) },
+    libraryStore: {
+      list: vi.fn(async () => [] as unknown[]),
+      get: vi.fn(),
+      save: vi.fn(async (id: string) => ({ workId: id })),
+      remove: vi.fn(async () => {}),
+    },
     settingsStore: {
       get: vi.fn(),
       update: vi.fn(async (c: unknown) => c),
@@ -61,6 +67,7 @@ vi.mock('../../stores', () => ({
   progressStore: h.progressStore,
   eventLog: h.eventLog,
   settingsStore: h.settingsStore,
+  libraryStore: h.libraryStore,
 }))
 
 const entry = {
@@ -117,6 +124,8 @@ async function open(path = `/read/${entry.id}`) {
 }
 
 beforeEach(() => {
+  h.libraryStore.list.mockResolvedValue([])
+  h.libraryStore.get.mockResolvedValue(undefined)
   h.engines.length = 0
   h.failOpen.value = false
   vi.clearAllMocks()
@@ -367,5 +376,84 @@ describe('finishing', () => {
     const engine = await open()
     fireEvent.click(screen.getByText('‹ Back'))
     expect(engine.close).toHaveBeenCalled()
+  })
+})
+
+describe('the dog-ear button', () => {
+  const saved = {
+    workId: entry.id,
+    shelf: 'default',
+    addedAt: 1000,
+    offline: false,
+  }
+
+  it('is in the top bar with a tooltip and keeps the reading position', async () => {
+    const engine = await open()
+    act(() => engine.locationCallbacks.forEach((cb) => cb(loc(0.3))))
+    const reader = screen.getByTestId('reader')
+    const place = reader.getAttribute('data-locator')
+    await waitFor(() => expect(h.progressStore.set).toHaveBeenCalled())
+    const saves = h.progressStore.set.mock.calls.length
+
+    const button = screen.getByRole('button', { name: 'Dog-ear it for later' })
+    expect(button).toHaveAttribute('title', 'Dog-ear it for later')
+    expect(screen.getByTestId('dog-ear-icon')).toHaveAttribute(
+      'data-filled',
+      'false',
+    )
+    await act(async () => {
+      fireEvent.click(button)
+    })
+
+    expect(h.eventLog.append).toHaveBeenCalledWith({
+      workId: entry.id,
+      type: 'save',
+    })
+    expect(h.libraryStore.save).toHaveBeenCalledWith(entry.id)
+    const filled = screen.getByRole('button', { name: 'Dog-eared' })
+    expect(filled).toHaveAttribute('title', 'Dog-eared')
+    expect(screen.getByTestId('dog-ear-icon')).toHaveAttribute(
+      'data-filled',
+      'true',
+    )
+    // The page did not turn and the position did not change.
+    expect(engine.next).not.toHaveBeenCalled()
+    expect(engine.prev).not.toHaveBeenCalled()
+    expect(reader.getAttribute('data-locator')).toBe(place)
+    expect(h.progressStore.set.mock.calls.length).toBe(saves)
+  })
+
+  it('starts filled for a dog-eared story, and toggling off shows Removed · Undo', async () => {
+    h.libraryStore.list.mockResolvedValue([saved])
+    h.libraryStore.get.mockResolvedValue(saved)
+    await open()
+    const filled = await screen.findByRole('button', { name: 'Dog-eared' })
+    await act(async () => {
+      fireEvent.click(filled)
+    })
+    expect(h.eventLog.append).toHaveBeenCalledWith({
+      workId: entry.id,
+      type: 'unsave',
+    })
+    expect(h.libraryStore.remove).toHaveBeenCalledWith(entry.id)
+    expect(screen.getByRole('status')).toHaveTextContent('Removed ·')
+    expect(
+      screen.getByRole('button', { name: 'Dog-ear it for later' }),
+    ).toBeVisible()
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    })
+    expect(h.libraryStore.save).toHaveBeenCalledWith(entry.id, {
+      shelf: 'default',
+      offline: false,
+      addedAt: 1000,
+    })
+    expect(h.eventLog.append).toHaveBeenCalledWith({
+      workId: entry.id,
+      type: 'undo',
+      reason: 'unsave',
+    })
+    expect(screen.getByRole('button', { name: 'Dog-eared' })).toBeVisible()
   })
 })

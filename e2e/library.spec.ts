@@ -12,7 +12,7 @@ test('a dog-eared story moves to Reading after two pages, with minutes left', as
     : (await card.locator('span.font-serif').innerText()).trim()
   await card.getByRole('button').click()
   await page.getByRole('button', { name: 'Dog-ear', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Dog-eared' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Dog-eared' })).toBeEnabled()
   await page.keyboard.press('Escape')
 
   // It is under Dog-eared in the Library, not under Reading.
@@ -141,4 +141,28 @@ test('un-dog-ear shows Removed · Undo, and Undo brings the story back', async (
   await expect(page.getByText(/Nothing dog-eared yet/)).toBeVisible()
   await page.getByRole('button', { name: 'Undo' }).click()
   await expect(page.getByRole('tabpanel').getByRole('listitem')).toHaveCount(1)
+})
+
+test('the reader has a dog-ear button that does not move the reading position', async ({
+  page,
+}) => {
+  await page.goto('/read/pg-1063-the-cask-of-amontillado')
+  await waitForReader(page)
+  await turnForward(page)
+  const reader = page.getByTestId('reader')
+  const place = await reader.getAttribute('data-locator')
+
+  await page.getByRole('button', { name: 'Dog-ear it for later' }).click()
+  const filled = page.getByRole('button', { name: 'Dog-eared' })
+  await expect(filled).toHaveAttribute('title', 'Dog-eared')
+  await expect(page.getByTestId('dog-ear-icon')).toHaveAttribute(
+    'data-filled',
+    'true',
+  )
+  await filled.click()
+  await expect(page.getByRole('status')).toContainText('Removed')
+  await page.getByRole('button', { name: 'Undo' }).click()
+  await expect(page.getByRole('button', { name: 'Dog-eared' })).toBeVisible()
+  await page.waitForTimeout(400)
+  await expect(reader).toHaveAttribute('data-locator', place ?? '')
 })

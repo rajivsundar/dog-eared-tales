@@ -17,8 +17,13 @@ const BAND_LABELS = {
   challenging: 'Challenging',
 } as const
 
+const MAX_GRADE_SHOWN = 12
+
 export function readingLevelLabel(level: CatalogEntry['readingLevel']): string {
-  return `${BAND_LABELS[level.band]} (grade ${level.grade})`
+  // Grades above 12 are shown as 12+. The catalog keeps the raw value.
+  const grade =
+    level.grade > MAX_GRADE_SHOWN ? `${MAX_GRADE_SHOWN}+` : level.grade
+  return `${BAND_LABELS[level.band]} (grade ${grade})`
 }
 
 /** The book a collection story comes from, without the Gutenberg subtitle. */

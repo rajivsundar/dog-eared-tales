@@ -58,7 +58,9 @@ describe('daily picks', () => {
   it('gives the same picks on every load that day, even after things change', async () => {
     const { s, deps } = setup()
     const first = await loadShortlist(deps, MORNING)
-    await s.eventLog.append({ workId: first[0].entry.id, type: 'finished' })
+    await s.eventLog.append({ workId: first[0].entry.id, type: 'love' })
+    const unlisted = catalog.find((e) => !ids(first).includes(e.id))!
+    await s.eventLog.append({ workId: unlisted.id, type: 'finished' })
     const again = await loadShortlist(deps, LATER)
     expect(again).toEqual(first)
   })
@@ -93,6 +95,33 @@ describe('shown events', () => {
     await recordShown(deps, picks, MORNING)
     await recordShown(deps, picks, NEXT_DAY)
     expect(s.events.filter((e) => e.type === 'shown')).toHaveLength(12)
+  })
+})
+
+describe('finished works', () => {
+  it('swaps a finished pick for the next best one and keeps the other 5', async () => {
+    const { s, deps } = setup()
+    const first = await loadShortlist(deps, MORNING)
+    await s.eventLog.append({ workId: first[2].entry.id, type: 'finished' })
+
+    const next = await loadShortlist(deps, LATER)
+    expect(next).toHaveLength(6)
+    expect(ids(next)).not.toContain(first[2].entry.id)
+    for (const i of [0, 1, 3, 4, 5]) expect(next[i]).toEqual(first[i])
+    expect(ids(first)).not.toContain(next[2].entry.id)
+    // It is stored, so the next visit shows the same list.
+    expect(ids(await loadShortlist(deps, LATER))).toEqual(ids(next))
+  })
+
+  it('swaps several finished picks at once, each in its own place', async () => {
+    const { s, deps } = setup()
+    const first = await loadShortlist(deps, MORNING)
+    await s.eventLog.append({ workId: first[0].entry.id, type: 'finished' })
+    await s.eventLog.append({ workId: first[5].entry.id, type: 'finished' })
+    const next = await loadShortlist(deps, LATER)
+    expect(next).toHaveLength(6)
+    expect(new Set(ids(next)).size).toBe(6)
+    for (const i of [1, 2, 3, 4]) expect(next[i]).toEqual(first[i])
   })
 })
 

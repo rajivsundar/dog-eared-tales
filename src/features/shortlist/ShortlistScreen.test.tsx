@@ -180,7 +180,7 @@ describe('detail sheet', () => {
     expect(within(sheet).getByText(/from A Big Book$/)).toBeInTheDocument()
   })
 
-  it('Dog-ear records save and adds the story to the library', async () => {
+  async function dogEarFirst() {
     renderHome()
     const items = await screen.findAllByRole('listitem')
     fireEvent.click(within(items[0]).getByRole('button'))
@@ -188,12 +188,42 @@ describe('detail sheet', () => {
     await act(async () => {
       fireEvent.click(within(sheet).getByRole('button', { name: 'Dog-ear' }))
     })
+    return sheet
+  }
+
+  it('Dog-ear records save and adds the story to the library', async () => {
+    const sheet = await dogEarFirst()
     const saves = stores.events.filter((e) => e.type === 'save')
     expect(saves).toHaveLength(1)
     expect(stores.library.has(saves[0].workId)).toBe(true)
     expect(
       within(sheet).getByRole('button', { name: 'Dog-eared' }),
-    ).toBeDisabled()
+    ).toBeEnabled()
+  })
+
+  it('tapping Dog-eared again un-dog-ears it, with Removed · Undo', async () => {
+    const sheet = await dogEarFirst()
+    const id = stores.events.find((e) => e.type === 'save')!.workId
+    await act(async () => {
+      fireEvent.click(within(sheet).getByRole('button', { name: 'Dog-eared' }))
+    })
+    expect(stores.events.filter((e) => e.type === 'unsave')).toEqual([
+      expect.objectContaining({ workId: id }),
+    ])
+    expect(stores.library.has(id)).toBe(false)
+    expect(within(sheet).getByRole('button', { name: 'Dog-ear' })).toBeVisible()
+    expect(screen.getByRole('status')).toHaveTextContent('Removed ·')
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    })
+    expect(stores.library.has(id)).toBe(true)
+    expect(stores.events.filter((e) => e.type === 'undo')).toEqual([
+      expect.objectContaining({ workId: id, reason: 'unsave' }),
+    ])
+    expect(
+      within(sheet).getByRole('button', { name: 'Dog-eared' }),
+    ).toBeVisible()
   })
 
   it('Read now records nothing by itself', async () => {

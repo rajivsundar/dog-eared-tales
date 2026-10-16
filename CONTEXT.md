@@ -16,4 +16,6 @@
 | Dog-eared                      | Library tab of kept works                            | `saved`     | Saved                 |
 | Your Long List                 | row of longer works offered once the reader is ready | `longList`  | Longer reads          |
 
+> Dog-ear saves a whole work for later. Reading position is saved automatically and is not a bookmark.
+
 > Note: the mock-up images in `docs/` still show the old labels; CONTEXT.md wins.

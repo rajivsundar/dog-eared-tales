@@ -10,6 +10,8 @@ import {
   resolveTheme,
 } from '../../engine/reader'
 import { eventLog, progressStore, settingsStore } from '../../stores'
+import { useDogEar } from '../library/useDogEar'
+import { UndoToast } from '../ui/UndoToast'
 import { AaPanel } from './AaPanel'
 import { EndScreen } from './EndScreen'
 import { ProgressBar } from './ProgressBar'
@@ -47,6 +49,9 @@ export default function ReaderScreen() {
 function Reader({ id }: { id: string }) {
   const navigate = useNavigate()
   const dark = useDeviceIsDark()
+  const dogEar = useDogEar()
+  const dogEared = dogEar.ids.has(id)
+  const dogEarLabel = dogEared ? 'Dog-eared' : 'Dog-ear it for later'
 
   const [phase, setPhase] = useState<Phase>('loading')
   const [entry, setEntry] = useState<CatalogEntry | null>(null)
@@ -252,6 +257,29 @@ function Reader({ id }: { id: string }) {
           </div>
           <button
             type="button"
+            aria-label={dogEarLabel}
+            title={dogEarLabel}
+            onClick={() => dogEar.toggle(id)}
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded"
+          >
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill={dogEared ? 'currentColor' : 'none'}
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              data-testid="dog-ear-icon"
+              data-filled={dogEared}
+            >
+              <path d="M6 3h9l4 4v14H6z" />
+              <path d="M15 3v4h4" strokeLinecap="round" />
+            </svg>
+          </button>
+          <button
+            type="button"
             aria-label="Text and theme settings"
             aria-expanded={panelOpen}
             onClick={() => setPanelOpen((open) => !open)}
@@ -271,6 +299,15 @@ function Reader({ id }: { id: string }) {
           minutesLeft={location?.minutesLeft ?? entry?.readingMinutes ?? 0}
         />
       </footer>
+
+      {dogEar.removed && (
+        <UndoToast
+          key={dogEar.removed.key}
+          position="bottom-14"
+          onUndo={dogEar.undo}
+          onExpire={dogEar.dismiss}
+        />
+      )}
 
       {panelOpen && phase !== 'finished' && (
         <div style={{ background: colors.background }}>

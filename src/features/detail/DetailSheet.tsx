@@ -169,10 +169,9 @@ export function DetailSheet({
           </Link>
           <button
             type="button"
-            title="Dog-ear it for later"
-            disabled={dogEared}
+            title={dogEared ? 'Dog-eared' : 'Dog-ear it for later'}
             onClick={onDogEar}
-            className={`${buttonBase} border border-line disabled:opacity-70`}
+            className={`${buttonBase} border border-line ${dogEared ? 'bg-line/40' : ''}`}
           >
             {dogEared ? 'Dog-eared' : 'Dog-ear'}
           </button>

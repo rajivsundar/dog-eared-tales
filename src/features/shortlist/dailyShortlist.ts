@@ -1,11 +1,6 @@
 import type { CatalogEntry } from '../../catalog'
-import { recommend } from '../../engine/recommend'
-import type {
-  EventLog,
-  LibraryStore,
-  ProfileStore,
-  SettingsStore,
-} from '../../stores'
+import { digestEvents, recommend } from '../../engine/recommend'
+import type { EventLog, ProfileStore, SettingsStore } from '../../stores'
 
 export interface ShortlistPick {
   entry: CatalogEntry
@@ -45,6 +40,49 @@ async function save(
   })
 }
 
+/** The best pick that is not already on the list, or undefined if there is none. */
+async function nextBest(
+  deps: ShortlistDeps,
+  taken: Set<string>,
+): Promise<ShortlistPick | undefined> {
+  const [profile, events] = await Promise.all([
+    deps.profile.get(),
+    deps.events.list(),
+  ])
+  const next = recommend({
+    catalog: deps.catalog,
+    profile,
+    events,
+    count: deps.catalog.length,
+  }).picks.find((p) => !taken.has(p.entry.id))
+  return next && { entry: next.entry, reason: next.reason }
+}
+
+/**
+ * A pick the reader has finished since the list was made is swapped, in the same place, for the
+ * next best pick. The other picks stay as they are.
+ */
+async function swapFinished(
+  deps: ShortlistDeps,
+  picks: ShortlistPick[],
+  now: Date,
+): Promise<ShortlistPick[]> {
+  const { finished } = digestEvents(await deps.events.list())
+  if (!picks.some((p) => finished.has(p.entry.id))) return picks
+  let current = picks
+  for (const done of picks.filter((p) => finished.has(p.entry.id))) {
+    const replacement = await nextBest(
+      deps,
+      new Set(current.map((p) => p.entry.id)),
+    )
+    current = replacement
+      ? current.map((p) => (p === done ? replacement : p))
+      : current.filter((p) => p !== done)
+  }
+  await save(deps, current, now)
+  return current
+}
+
 /**
  * Today's 6 picks. The first load of a local day asks the recommender and stores the answer;
  * every later load that day returns the stored picks.
@@ -61,7 +99,9 @@ export async function loadShortlist(
       const entry = byId.get(p.workId)
       return entry ? [{ entry, reason: p.reason }] : []
     })
-    if (picks.length === stored.picks.length) return picks
+    if (picks.length === stored.picks.length) {
+      return swapFinished(deps, picks, now)
+    }
   }
   const [profile, events] = await Promise.all([
     deps.profile.get(),
@@ -105,15 +145,6 @@ export async function recordTap(
   await deps.events.append({ workId, type: 'tap' })
 }
 
-/** Dog-ear: log it and keep the work in the library. */
-export async function dogEar(
-  deps: Pick<ShortlistDeps, 'events'> & { library: LibraryStore },
-  workId: string,
-): Promise<void> {
-  await deps.events.append({ workId, type: 'save' })
-  await deps.library.save(workId)
-}
-
 /**
  * "Not for me": logs it, swaps in the next best pick in the same place, and stores the new list.
  * The returned list has no gap if the catalog has nothing left to offer.
@@ -125,18 +156,10 @@ export async function removePick(
   now: Date,
 ): Promise<{ picks: ShortlistPick[]; replacement?: ShortlistPick }> {
   await deps.events.append({ workId, type: 'notForMe' })
-  const [profile, events] = await Promise.all([
-    deps.profile.get(),
-    deps.events.list(),
-  ])
-  const taken = new Set(current.map((p) => p.entry.id))
-  const next = recommend({
-    catalog: deps.catalog,
-    profile,
-    events,
-    count: deps.catalog.length,
-  }).picks.find((p) => !taken.has(p.entry.id))
-  const replacement = next && { entry: next.entry, reason: next.reason }
+  const replacement = await nextBest(
+    deps,
+    new Set(current.map((p) => p.entry.id)),
+  )
   const picks = replacement
     ? current.map((p) => (p.entry.id === workId ? replacement : p))
     : current.filter((p) => p.entry.id !== workId)
