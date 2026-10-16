@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetCatalogCache } from '../../catalog'
 import { fakeCatalog, fakeStores } from '../shortlist/fakeStores'
@@ -33,6 +34,14 @@ vi.mock('../../stores', () => {
 
 let stores: ReturnType<typeof fakeStores>
 
+function renderSettings() {
+  return render(
+    <MemoryRouter>
+      <SettingsScreen />
+    </MemoryRouter>,
+  )
+}
+
 beforeEach(() => {
   stores = fakeStores()
   h.current = stores
@@ -50,7 +59,7 @@ afterEach(() => vi.unstubAllGlobals())
 
 describe('Your taste', () => {
   it('says there is nothing yet for a new reader', async () => {
-    render(<SettingsScreen />)
+    renderSettings()
     expect(await screen.findAllByText('Nothing yet.')).toHaveLength(2)
   })
 
@@ -58,7 +67,7 @@ describe('Your taste', () => {
     // story-1 is eerie in the test catalog.
     await stores.eventLog.append({ workId: 'story-1', type: 'finished' })
     await stores.eventLog.append({ workId: 'story-1', type: 'love' })
-    render(<SettingsScreen />)
+    renderSettings()
     const moods = (await screen.findByText('Top moods')).parentElement!
     expect(within(moods).getByText('eerie')).toBeInTheDocument()
     const genres = screen.getByText('Top genres').parentElement!
@@ -76,7 +85,7 @@ describe('Your taste', () => {
       wordsPerMinute: 238,
       version: 2,
     })
-    render(<SettingsScreen />)
+    renderSettings()
     await screen.findByText('eerie')
     fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
     // Cancel changes nothing.
@@ -91,5 +100,25 @@ describe('Your taste', () => {
     expect(stores.events.filter((e) => e.type === 'love')).toHaveLength(1)
     expect(await stores.profileStore.get()).toBeUndefined()
     expect(await screen.findAllByText('Nothing yet.')).toHaveLength(2)
+  })
+})
+
+describe('About', () => {
+  it('shows the line from CONTEXT.md and a Redo onboarding link', async () => {
+    renderSettings()
+    expect(
+      screen.getByRole('heading', { name: 'About', level: 2 }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Named after Nathaniel Hawthorne’s Twice-Told Tales (1837) — stories worth telling again.',
+      ),
+    ).toBeInTheDocument()
+    const redo = screen.getByRole('link', { name: 'Redo onboarding' })
+    expect(redo).toHaveAttribute('href', '/welcome')
+    // Following it records nothing and deletes nothing.
+    await stores.eventLog.append({ workId: 'story-1', type: 'finished' })
+    fireEvent.click(redo)
+    expect(stores.events).toHaveLength(1)
   })
 })

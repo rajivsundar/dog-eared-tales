@@ -27,6 +27,47 @@ export const PUSH = {
   tooOldFashioned: -0.5,
 } as const
 
+/** Onboarding answers count for less than real reading. */
+export const ONBOARD_PUSH = {
+  mood: 1,
+  love: 1.5,
+  maybe: 0.25,
+  notForMe: -1.5,
+} as const
+
+/** The marker that starts an onboarding run. Only the newest run counts. */
+export const ONBOARD_WORK = 'onboarding'
+export const ONBOARD_START = 'start'
+export type CardAnswer = 'love' | 'maybe' | 'notForMe'
+
+/** What the newest onboarding run recorded: picked moods and taste-card answers. */
+export function onboardingAnswers(events: ReaderEvent[]): {
+  moods: { name: string; at: number }[]
+  cards: { workId: string; answer: CardAnswer; at: number }[]
+} {
+  const list = eventsSinceReset(events).filter((e) => e.type === 'onboard')
+  let start = 0
+  list.forEach((e, i) => {
+    if (e.workId === ONBOARD_WORK && e.reason === ONBOARD_START) start = i + 1
+  })
+  const answers = {
+    moods: [] as { name: string; at: number }[],
+    cards: [] as { workId: string; answer: CardAnswer; at: number }[],
+  }
+  for (const e of list.slice(start)) {
+    if (e.workId === ONBOARD_WORK && e.reason?.startsWith('mood:')) {
+      answers.moods.push({ name: e.reason.slice(5), at: e.at })
+    } else if (
+      e.reason === 'love' ||
+      e.reason === 'maybe' ||
+      e.reason === 'notForMe'
+    ) {
+      answers.cards.push({ workId: e.workId, answer: e.reason, at: e.at })
+    }
+  }
+  return answers
+}
+
 export const NOT_FOR_ME_REASONS = [
   { id: 'too-long', label: 'Too long' },
   { id: 'not-my-genre', label: 'Not my genre' },
@@ -181,6 +222,25 @@ export function buildProfile(
     if (state.saved && state.savedAt !== undefined)
       add(all, PUSH.save, state.savedAt)
     if (state.stoppedAt !== undefined) add(all, PUSH.stopped, state.stoppedAt)
+  }
+
+  // The newest onboarding run: picked moods, then taste-card answers.
+  const onboarding = onboardingAnswers(events)
+  for (const mood of onboarding.moods) {
+    add([`mood:${mood.name}`], ONBOARD_PUSH.mood, mood.at)
+  }
+  for (const card of onboarding.cards) {
+    const entry = byId.get(card.workId)
+    if (!entry) continue
+    add(
+      [
+        ...entry.moods.map((m) => `mood:${m}`),
+        ...entry.genres.map((g) => `genre:${g}`),
+        `length:${entry.lengthClass}`,
+      ],
+      ONBOARD_PUSH[card.answer],
+      card.at,
+    )
   }
 
   const facetBeliefs: Profile['facetBeliefs'] = {}

@@ -40,15 +40,43 @@ export function shortlistTitle(date: Date): string {
   return hour >= 18 || hour < 4 ? "Tonight's Shortlist" : 'Your Shortlist'
 }
 
+/** Works kept off today's list, from the taste cards answered Not for me. Only lasts for the day. */
+async function todaysAvoid(
+  deps: Pick<ShortlistDeps, 'settings'>,
+  now: Date,
+): Promise<string[]> {
+  const stored = (await deps.settings.get()).shortlist
+  return stored && stored.date === localDay(now) ? (stored.avoid ?? []) : []
+}
+
 async function save(
   deps: ShortlistDeps,
   picks: ShortlistPick[],
+  now: Date,
+  avoid?: string[],
+): Promise<void> {
+  const keep = avoid ?? (await todaysAvoid(deps, now))
+  await deps.settings.update({
+    shortlist: {
+      date: localDay(now),
+      picks: picks.map((p) => ({ workId: p.entry.id, reason: p.reason })),
+      ...(keep.length > 0 ? { avoid: keep } : {}),
+    },
+  })
+}
+
+/** Stores the first list made when onboarding finishes, with the works to keep off it today. */
+export async function saveFirstShortlist(
+  deps: Pick<ShortlistDeps, 'settings'>,
+  picks: ShortlistPick[],
+  avoid: string[],
   now: Date,
 ): Promise<void> {
   await deps.settings.update({
     shortlist: {
       date: localDay(now),
       picks: picks.map((p) => ({ workId: p.entry.id, reason: p.reason })),
+      ...(avoid.length > 0 ? { avoid } : {}),
     },
   })
 }
@@ -128,6 +156,7 @@ async function nextBest(
     catalog: deps.catalog,
     profile,
     events,
+    exclude: await todaysAvoid(deps, now),
     count: deps.catalog.length,
   }).picks.find((p) => !taken.has(p.entry.id))
   return next && { entry: next.entry, reason: next.reason }

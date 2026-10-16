@@ -19,3 +19,19 @@ export async function waitForReader(page: Page): Promise<void> {
   await expect(reader).toHaveAttribute('data-phase', 'ready')
   await expect(reader).not.toHaveAttribute('data-locator', '')
 }
+
+/**
+ * Opens the app as a returning reader. A fresh browser starts onboarding, so this skips it
+ * ("Skip setup") and waits for Your Shortlist.
+ */
+export async function startApp(page: Page): Promise<void> {
+  await page.goto('/')
+  const welcome = page.getByRole('button', { name: 'Find my first story' })
+  const cards = page.getByRole('listitem')
+  await expect(welcome.or(cards.first())).toBeVisible()
+  if (await welcome.isVisible()) {
+    await welcome.click()
+    await page.getByRole('button', { name: 'Skip setup' }).click()
+  }
+  await expect(cards).toHaveCount(6)
+}

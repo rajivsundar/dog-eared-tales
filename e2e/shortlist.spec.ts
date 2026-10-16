@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { startApp } from './helpers'
 
 const sizes = [
   { name: 'phone (360 px wide)', width: 360, height: 740, columns: 1 },
@@ -8,7 +9,7 @@ const sizes = [
 for (const size of sizes) {
   test(`Your Shortlist fits the ${size.name}`, async ({ page }) => {
     await page.setViewportSize({ width: size.width, height: size.height })
-    await page.goto('/')
+    await startApp(page)
     const cards = page.getByRole('listitem')
     await expect(cards).toHaveCount(6)
 
@@ -47,7 +48,7 @@ for (const size of sizes) {
 }
 
 test('the same picks come back after a reload', async ({ page }) => {
-  await page.goto('/')
+  await startApp(page)
   const cards = page.getByRole('listitem')
   await expect(cards).toHaveCount(6)
   const before = await cards.allInnerTexts()
@@ -57,7 +58,7 @@ test('the same picks come back after a reload', async ({ page }) => {
 })
 
 test('Not for me swaps the card and Undo brings it back', async ({ page }) => {
-  await page.goto('/')
+  await startApp(page)
   const cards = page.getByRole('listitem')
   await expect(cards).toHaveCount(6)
   const before = await cards.allInnerTexts()

@@ -29,6 +29,7 @@ export type ReaderEventType =
   | 'tap'
   | 'undo'
   | 'reset'
+  | 'onboard'
   | 'finished'
   | 'stopped'
   | 'abandoned'
@@ -90,6 +91,8 @@ export interface DailyShortlist {
   /** Local date, "YYYY-MM-DD". */
   date: string
   picks: Array<{ workId: string; reason: string }>
+  /** Works kept off today's list and its replacements (taste cards answered Not for me). */
+  avoid?: string[]
 }
 
 export interface Settings {

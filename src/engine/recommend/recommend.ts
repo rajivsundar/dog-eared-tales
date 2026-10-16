@@ -25,9 +25,16 @@ export const DEFAULT_COUNT = 6
 /** A mood counts as "picked" when the reader's weight for it is above this. */
 const PICKED = 0.5
 
-function eligible(catalog: CatalogEntry[], history: History): CatalogEntry[] {
+function eligible(
+  catalog: CatalogEntry[],
+  history: History,
+  exclude: ReadonlySet<string>,
+): CatalogEntry[] {
   return catalog.filter(
-    (e) => !history.finished.has(e.id) && !history.notForMe.has(e.id),
+    (e) =>
+      !history.finished.has(e.id) &&
+      !history.notForMe.has(e.id) &&
+      !exclude.has(e.id),
   )
 }
 
@@ -39,7 +46,7 @@ function hasBeliefs(input: RecommendInput): boolean {
 export function recommend(input: RecommendInput): RecommendResult {
   const count = input.count ?? DEFAULT_COUNT
   const history = digestEvents(input.events)
-  const pool = eligible(input.catalog, history)
+  const pool = eligible(input.catalog, history, new Set(input.exclude ?? []))
   return hasBeliefs(input)
     ? { mode: 'personal', picks: personalPicks(input, pool, history, count) }
     : { mode: 'starter', picks: starterPicks(pool, history, count) }

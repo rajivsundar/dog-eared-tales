@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router'
 import { loadCatalog } from '../../catalog'
 import { WEIGHT_MAX, buildProfile, topFacets } from '../../engine/recommend'
 import { eventLog, profileStore } from '../../stores'
@@ -140,6 +141,26 @@ export function SettingsScreen() {
             </div>
           </div>
         )}
+      </section>
+
+      <section aria-labelledby="about-title" className="mt-10">
+        <h2 id="about-title" className="font-serif text-2xl font-bold">
+          About
+        </h2>
+        <p className="mt-2">
+          Named after Nathaniel Hawthorne’s Twice-Told Tales (1837) — stories
+          worth telling again.
+        </p>
+        <p className="mt-4 text-muted">
+          Redo onboarding to pick your moods and taste cards again. Your reading
+          history stays as it is.
+        </p>
+        <Link
+          to="/welcome"
+          className="mt-3 inline-flex min-h-11 items-center rounded-full border border-line px-5 font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        >
+          Redo onboarding
+        </Link>
       </section>
 
       <p className="mt-10 text-sm text-muted">

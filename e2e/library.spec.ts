@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test'
-import { turnForward, waitForReader } from './helpers'
+import { startApp, turnForward, waitForReader } from './helpers'
 
 test('a dog-eared story moves to Reading after two pages, with minutes left', async ({
   page,
 }) => {
   // Dog-ear the first story on Your Shortlist.
-  await page.goto('/')
+  await startApp(page)
   const card = page.getByRole('listitem').first()
   const title = (await card.getByRole('heading').count())
     ? ''
@@ -75,6 +75,7 @@ test('a dog-eared story moves to Reading after two pages, with minutes left', as
 test('the bottom navigation is on every screen except the reader, with big tap targets', async ({
   page,
 }) => {
+  await startApp(page)
   const nav = page.getByRole('navigation', { name: 'Main' })
   for (const [path, current] of [
     ['/', 'Shortlist'],
@@ -107,7 +108,7 @@ test('the Removed · Undo message sits above the bottom navigation', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 360, height: 740 })
-  await page.goto('/')
+  await startApp(page)
   await page.getByRole('listitem').first().getByRole('button').click()
   await page.getByRole('button', { name: 'Not for me' }).click()
   const toast = page.getByRole('status')
@@ -125,7 +126,7 @@ test('the Removed · Undo message sits above the bottom navigation', async ({
 test('un-dog-ear shows Removed · Undo, and Undo brings the story back', async ({
   page,
 }) => {
-  await page.goto('/')
+  await startApp(page)
   await page.getByRole('listitem').first().getByRole('button').click()
   await page.getByRole('button', { name: 'Dog-ear', exact: true }).click()
   await page.keyboard.press('Escape')

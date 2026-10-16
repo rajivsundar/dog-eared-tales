@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetCatalogCache } from '../catalog'
+import { eventLog } from '../stores'
 import App from './App'
 
 // The app reads its theme from the settings store; the tests use a stand-in.
@@ -51,12 +52,23 @@ function renderAt(path: string) {
 }
 
 describe('App', () => {
+  it('sends a first-time reader (no profile, no events) to onboarding', async () => {
+    renderAt('/')
+    expect(
+      await screen.findByRole('button', { name: 'Find my first story' }),
+    ).toBeInTheDocument()
+    // Onboarding has no bottom navigation.
+    expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull()
+  })
+
   it('shows the name and tagline on the home page', async () => {
+    // A returning reader: there is already something in the event log.
+    await eventLog.append({ workId: 'x', type: 'open' })
     // These two stand-in stories are too bare for the recommender; that is not what this test checks.
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
     renderAt('/')
     expect(
-      screen.getByRole('heading', { name: 'Twice Told' }),
+      await screen.findByRole('heading', { name: 'Twice Told' }),
     ).toBeInTheDocument()
     expect(
       screen.getByText(

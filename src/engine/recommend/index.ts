@@ -9,3 +9,5 @@ export type {
   Recommendation,
   Slot,
 } from './types'
+export { pickTasteCards, TASTE_CARD_COUNT } from './tasteCards'
+export { firstShortlist } from './firstShortlist'

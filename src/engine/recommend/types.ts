@@ -10,6 +10,8 @@ export interface RecommendInput {
   profile?: Pick<Profile, 'facetBeliefs' | 'ladderLevel'> | null
   /** Everything in the event log. */
   events: ReaderEvent[]
+  /** Works to leave out of this list only. */
+  exclude?: string[]
   /** How many picks to return. Defaults to 6. */
   count?: number
 }
