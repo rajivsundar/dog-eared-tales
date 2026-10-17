@@ -103,3 +103,22 @@ export function removeBeforeText({ node, offset }: TextPosition): void {
     current = current.parentNode
   }
 }
+
+const PLACEHOLDER = /^\s*(?:[{[]\s*Illustration\b[^}\]]*[}\]]\s*)+$/i
+
+/**
+ * Removes the "{Illustration}" and "[Illustration: caption]" placeholder lines that Project
+ * Gutenberg leaves where a picture was. Only a block that holds nothing but placeholders goes,
+ * and never one with a real image in it.
+ */
+export function removeIllustrationPlaceholders(doc: Document): void {
+  const body = doc.body
+  if (!body) return
+  const blocks = body.querySelectorAll('p, div, span, pre, li, blockquote')
+  for (const block of Array.from(blocks)) {
+    if (!block.isConnected) continue
+    if (block.querySelector('img, svg, image')) continue
+    if (block.querySelector('p, div, pre, li, blockquote')) continue
+    if (PLACEHOLDER.test(block.textContent ?? '')) block.remove()
+  }
+}

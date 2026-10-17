@@ -18,6 +18,7 @@ import {
   findText,
   removeBefore,
   removeBeforeText,
+  removeIllustrationPlaceholders,
   removeFrom,
   removeFromText,
 } from './trimDocument'
@@ -296,6 +297,7 @@ export class FoliateReaderEngine implements ReaderEngine {
 
   /** Runs each time foliate-js loads a chapter file, before it is laid out in pages. */
   #onLoad({ doc, index }: { doc: Document; index: number }): void {
+    removeIllustrationPlaceholders(doc)
     this.#trimPage(doc, index)
   }
 

@@ -6,6 +6,7 @@ import {
   removeBeforeText,
   removeFrom,
   removeFromText,
+  removeIllustrationPlaceholders,
 } from './trimDocument'
 
 function page(html: string): Document {
@@ -98,5 +99,19 @@ describe('cutting a page at some text', () => {
     const doc = page('<p>Notes.</p><p>Chapter one. It begins.</p><p>More.</p>')
     removeBeforeText(findText(doc, 'It begins')!)
     expect(text(doc)).toBe('It begins. More.')
+  })
+})
+
+describe('illustration placeholders', () => {
+  it('removes placeholder-only blocks but keeps text and real images', () => {
+    const doc = page(
+      '<p>Before.</p><p>{Illustration}</p><div>[Illustration: A boy]</div>' +
+        '<p>She said {Illustration} is odd.</p><div><img src="a.jpg" alt="x"/>{Illustration}</div><p>After.</p>',
+    )
+    removeIllustrationPlaceholders(doc)
+    expect(text(doc)).toBe(
+      'Before. She said {Illustration} is odd. {Illustration} After.',
+    )
+    expect(doc.querySelectorAll('img')).toHaveLength(1)
   })
 })

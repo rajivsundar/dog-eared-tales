@@ -1032,6 +1032,21 @@ export function cutAtText(
   return keep === 'from' ? text.slice(at) : text.slice(0, at)
 }
 
+/**
+ * Removes the "{Illustration}" and "[Illustration: caption]" placeholders that Project Gutenberg
+ * leaves where a picture was. A line holding only placeholders goes completely; real images are not text.
+ */
+export function stripIllustrationPlaceholders(text: string): string {
+  const placeholder = String.raw`[{[]\s*Illustration\b[^}\]]*[}\]]`
+  const wholeLine = new RegExp(
+    String.raw`^[ \t\u0001]*(?:${placeholder}[ \t\u0001]*)+\n?`,
+    'gim',
+  )
+  return text
+    .replace(wholeLine, '')
+    .replace(new RegExp(String.raw`[ \t]*${placeholder}`, 'gi'), '')
+}
+
 export interface BuildOptions {
   /** The size in bytes of the book as published (after shrinking), by file name. Left out, no size rule applies. */
   publishedBytes?: (file: string) => number | undefined
@@ -1122,6 +1137,7 @@ export function buildCatalog(options: BuildOptions = {}): BuildResult {
     if (startAtText) marked = cutAtText(marked, startAtText, 'from', where)
     if (endBeforeText)
       marked = cutAtText(marked, endBeforeText, 'before', where)
+    marked = stripIllustrationPlaceholders(marked)
     const text = marked.split('\u0001').join('')
 
     const id = `pg-${number}-${slugify(row.story_title)}`

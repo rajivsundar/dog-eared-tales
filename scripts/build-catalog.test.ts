@@ -16,6 +16,7 @@ import {
   countWords,
   coverSvg,
   cutAtText,
+  stripIllustrationPlaceholders,
   eraBandFor,
   findFirstLine,
   firstSentence,
@@ -770,6 +771,36 @@ describe('Wild Animals I Have Known ranges', () => {
         if (own) continue
         expect(tail, story.id + ' ends with ' + name).not.toContain(name)
       }
+    }
+  })
+})
+
+describe('illustration placeholders and front matter', () => {
+  it('strips placeholder lines and inline placeholders, and nothing else', () => {
+    const text =
+      'One.\n{Illustration}\nTwo.\n[Illustration: A boy] {Illustration}\nThree {Illustration: tree} four.\n'
+    expect(stripIllustrationPlaceholders(text)).toBe(
+      'One.\nTwo.\nThree four.\n',
+    )
+    expect(stripIllustrationPlaceholders('A [note] in {braces}.')).toBe(
+      'A [note] in {braces}.',
+    )
+  })
+
+  it('leaves no placeholder in any shipped text', () => {
+    for (const text of Object.values(result.rangeText)) {
+      expect(text).not.toMatch(/[{[]\s*Illustration/i)
+    }
+  })
+
+  it('opens Beautiful Joe, Peter Rabbit and A Dog’s Tale at the story itself', () => {
+    const starts: Record<string, string> = {
+      'pg-2818-beautiful-joe': 'MY name is Beautiful Joe',
+      'pg-14838-the-tale-of-peter-rabbit': 'Once upon a time',
+      'pg-3174-a-dogs-tale': 'My father was a St. Bernard',
+    }
+    for (const [id, start] of Object.entries(starts)) {
+      expect(result.rangeText[id].trimStart().startsWith(start), id).toBe(true)
     }
   })
 })
