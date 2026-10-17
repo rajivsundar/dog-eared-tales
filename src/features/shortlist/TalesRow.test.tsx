@@ -91,9 +91,28 @@ function on(month: number, day: number) {
   vi.setSystemTime(new Date(2026, month - 1, day, 11, 0))
 }
 
-beforeEach(() => {
+/** Today's Your Shortlist, chosen by the test (in the stored form). */
+async function shortlistOf(...ids: string[]) {
+  await stores.settingsStore.update({
+    shortlist: {
+      date: '2026-10-16',
+      picks: ids.map((workId) => ({ workId, reason: 'A good place to start' })),
+    },
+  })
+}
+
+beforeEach(async () => {
   stores = fakeStores()
   h.current = stores
+  // By default the shortlist holds no eerie works, so the row has them all to choose from.
+  await shortlistOf(
+    'story-0',
+    'story-2',
+    'story-3',
+    'story-4',
+    'story-7',
+    'story-8',
+  )
   resetCatalogCache()
   vi.stubGlobal(
     'fetch',
@@ -210,6 +229,57 @@ describe('Tales for Longer Nights', () => {
     expect(
       stores.events.filter((e) => e.workId === USHER && e.type === 'notForMe'),
     ).toHaveLength(1)
+  })
+
+  it('skips works already on today’s Your Shortlist', async () => {
+    await shortlistOf(
+      USHER,
+      'story-6',
+      'story-0',
+      'story-2',
+      'story-3',
+      'story-4',
+    )
+    renderHome()
+    const tales = await row()
+    expect(tales).not.toHaveTextContent('The Fall of the House of Usher')
+    expect(tales).not.toHaveTextContent('Story 6')
+    expect(within(tales).getAllByRole('listitem').length).toBeGreaterThan(0)
+  })
+
+  it('leaves out science fiction unless it is also horror or a ghost story', async () => {
+    // The stand-in catalog has no science fiction, so add some.
+    const base = catalog()
+    base.push(
+      {
+        ...base[1],
+        id: 'sf-eerie',
+        title: 'An Eerie Rocket',
+        isCollection: false,
+        genres: ['science fiction'],
+        moods: ['eerie'],
+      },
+      {
+        ...base[1],
+        id: 'sf-horror',
+        title: 'A Horror Rocket',
+        isCollection: false,
+        genres: ['science fiction', 'horror'],
+        moods: ['tense'],
+      },
+    )
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ schemaVersion: 1, entries: base }),
+      })),
+    )
+    renderHome()
+    const tales = await row()
+    expect(tales).not.toHaveTextContent('An Eerie Rocket')
+    expect(tales).toHaveTextContent('A Horror Rocket')
   })
 
   it('keeps its picks in the settings, so their books are stored for offline', async () => {

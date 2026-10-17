@@ -46,9 +46,10 @@ export function WelcomeHero({
       aria-labelledby="welcome-title"
       className="relative isolate mx-auto grid max-w-5xl items-center gap-8 py-4 lg:grid-cols-2 lg:gap-14 lg:py-12"
     >
-      {art && <art.Leaves />}
       {/* Art: a fan of three real covers. Decorative, so it is hidden from screen readers. */}
-      <div className="flex flex-col items-center">
+      <div className="relative flex flex-col items-center">
+        {/* The leaves fall only here, behind the covers and the drawing, never over the text. */}
+        {art && <art.Leaves />}
         <div
           aria-hidden="true"
           data-testid="cover-fan"

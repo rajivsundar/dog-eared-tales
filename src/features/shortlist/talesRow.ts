@@ -45,15 +45,17 @@ async function ranked(
 }
 
 /**
- * The seasonal row for today. Finished works and works marked Not for me never appear. The list is
+ * The seasonal row for today. Finished works, works marked Not for me and works already on today's
+ * Your Shortlist never appear. The list is
  * kept in the settings so its books can be stored for offline reading.
  */
 export async function loadTalesRow(
   deps: ShortlistDeps,
   season: Pick<Season, 'talesRow'>,
   now: Date,
+  shortlistIds: string[] = [],
 ): Promise<ShortlistPick[]> {
-  const picks = (await ranked(deps, season, now)).slice(0, SIZE)
+  const picks = (await ranked(deps, season, now, shortlistIds)).slice(0, SIZE)
   await save(deps, picks, now)
   return picks
 }
@@ -65,9 +67,10 @@ export async function removeTale(
   current: ShortlistPick[],
   workId: string,
   now: Date,
+  shortlistIds: string[] = [],
 ): Promise<ShortlistPick[]> {
   await deps.events.append({ workId, type: 'notForMe' })
-  const picks = (await ranked(deps, season, now)).slice(0, SIZE)
+  const picks = (await ranked(deps, season, now, shortlistIds)).slice(0, SIZE)
   await save(deps, picks, now)
   void current
   return picks

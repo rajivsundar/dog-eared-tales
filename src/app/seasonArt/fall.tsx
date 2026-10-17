@@ -9,45 +9,73 @@ import type { SeasonArt } from './types'
  * warm colours.
  */
 
-const LEAF_COLORS = ['#c2571a', '#d9962b', '#8c3b1f', '#b5651d']
+const LEAF_COLORS = ['#c2571a', '#d9962b', '#a63d1f', '#b8791d']
 
-/** A rounded leaf (viewBox 24). */
-const ROUND_LEAF = 'M12 2C6 6 4 12 12 22 20 12 18 6 12 2Z'
-/** A lobed, maple-like leaf (viewBox 24). */
-const LOBED_LEAF = 'M12 2l2 5 5-1-3 5 5 2-6 2 1 6-4-3-4 3 1-6-6-2 5-2-3-5 5 1z'
+/**
+ * Three leaves, each drawn in a 32-unit box with a stem at the bottom: a maple, an oak and a
+ * simple oval leaf. `body` is the outline, `veins` the lines inside it.
+ */
+const LEAVES_SHAPES = {
+  maple: {
+    body: 'M16 2L18.6 8.4 23.5 6.5 22 12.5 28.5 11.5 25 16.5 30 19.5 22.5 20.5 23.5 25 17 23.2 16 25 15 23.2 8.5 25 9.5 20.5 2 19.5 7 16.5 3.5 11.5 10 12.5 8.5 6.5 13.4 8.4Z',
+    veins: 'M16 24V7M16 21L8 15M16 21L24 15',
+  },
+  oak: {
+    body: 'M16 3C19 3 19 7 21 7 24 6 25 9 23.5 11 27 12 26.5 16 23.5 17 26 19.5 24 23 21 22 20 25 17.5 25 16 24 14.5 25 12 25 11 22 8 23 6 19.5 8.5 17 5.5 16 5 12 8.5 11 7 9 8 6 11 7 13 7 13 3 16 3Z',
+    veins: 'M16 24V6M16 20L10 15M16 20L22 15',
+  },
+  oval: {
+    body: 'M16 3C25 8 26 19 16 25 6 19 7 8 16 3Z',
+    veins: 'M16 25V6M16 19L10.5 14M16 19L21.5 14',
+  },
+}
+type LeafKind = keyof typeof LEAVES_SHAPES
 
+/** A leaf with a visible stem. Its fill is the `color` of the element; the outline is the theme ink. */
 function LeafShape({
-  lobed,
+  kind,
+  size,
   className,
   style,
 }: {
-  lobed?: boolean
+  kind: LeafKind
+  /** Width and height, for a leaf drawn inside another drawing. */
+  size?: number
   className?: string
   style?: React.CSSProperties
 }) {
+  const { body, veins } = LEAVES_SHAPES[kind]
   return (
     <svg
-      viewBox="0 0 24 24"
+      viewBox="0 0 32 32"
+      width={size}
+      height={size}
       aria-hidden="true"
       className={className}
       style={style}
     >
       <path
-        d={lobed ? LOBED_LEAF : ROUND_LEAF}
+        d="M16 24.5L16.6 31"
+        stroke="var(--ink)"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        fill="none"
+      />
+      <path
+        d={body}
         fill="currentColor"
         stroke="var(--ink)"
-        strokeWidth="1"
+        strokeWidth="1.3"
         strokeLinejoin="round"
       />
-      {!lobed && (
-        <path
-          d="M12 6v14"
-          stroke="var(--ink)"
-          strokeWidth="0.8"
-          strokeLinecap="round"
-          opacity="0.5"
-        />
-      )}
+      <path
+        d={veins}
+        stroke="var(--ink)"
+        strokeWidth="0.9"
+        strokeLinecap="round"
+        fill="none"
+        opacity="0.55"
+      />
     </svg>
   )
 }
@@ -165,14 +193,9 @@ function Scene() {
         strokeWidth="1.6"
         strokeLinecap="round"
       />
-      <path
-        d={LOBED_LEAF}
-        transform="translate(96 104) rotate(22 12 22) scale(0.85)"
-        fill="#c2571a"
-        className="stroke-ink"
-        strokeWidth="1.3"
-        strokeLinejoin="round"
-      />
+      <g transform="translate(99 98) rotate(20 16 30)">
+        <LeafShape kind="maple" size={26} style={{ color: '#c2571a' }} />
+      </g>
     </svg>
   )
 }
@@ -207,17 +230,25 @@ function useTabHidden(): boolean {
   return hidden
 }
 
-const LEAVES = [
-  { left: 6, size: 22, delay: 0, duration: 13, rest: 18, lobed: false },
-  { left: 22, size: 16, delay: 3.5, duration: 17, rest: 62, lobed: true },
-  { left: 41, size: 26, delay: 7, duration: 15, rest: 36, lobed: true },
-  { left: 63, size: 18, delay: 1.5, duration: 18, rest: 78, lobed: false },
-  { left: 80, size: 24, delay: 5, duration: 14, rest: 24, lobed: true },
-  { left: 93, size: 15, delay: 9, duration: 16, rest: 55, lobed: false },
+const LEAVES: {
+  left: number
+  size: number
+  delay: number
+  duration: number
+  rest: number
+  kind: LeafKind
+}[] = [
+  { left: 4, size: 38, delay: 0, duration: 13, rest: 16, kind: 'maple' },
+  { left: 24, size: 28, delay: 3.5, duration: 17, rest: 60, kind: 'oak' },
+  { left: 44, size: 34, delay: 7, duration: 15, rest: 34, kind: 'oval' },
+  { left: 62, size: 30, delay: 1.5, duration: 18, rest: 76, kind: 'maple' },
+  { left: 72, size: 36, delay: 5, duration: 14, rest: 22, kind: 'oak' },
+  { left: 84, size: 26, delay: 9, duration: 16, rest: 52, kind: 'oval' },
 ]
 
 /**
- * A few leaves falling behind the welcome page. They stand still when the reader prefers reduced
+ * A few leaves falling behind the illustration (they never cross text: the welcome page puts them
+ * only in the illustration area). They stand still when the reader prefers reduced
  * motion, and pause while the tab is hidden.
  */
 function Leaves() {
@@ -229,10 +260,10 @@ function Leaves() {
       data-testid="season-leaves"
       data-motion={reduced ? 'static' : 'animated'}
       data-paused={hidden ? 'true' : 'false'}
-      className="pointer-events-none absolute inset-0 -z-0 overflow-hidden"
+      className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
     >
       <style>{`
-        .tt-leaf { position: absolute; top: var(--rest); opacity: .7;
+        .tt-leaf { position: absolute; top: var(--rest); opacity: .92;
           animation: tt-fall var(--duration) linear var(--delay) infinite; }
         @keyframes tt-fall {
           0% { top: -8%; transform: translateX(0) rotate(0deg); }
@@ -250,7 +281,7 @@ function Leaves() {
       {LEAVES.map((leaf, i) => (
         <LeafShape
           key={i}
-          lobed={leaf.lobed}
+          kind={leaf.kind}
           className="tt-leaf"
           style={{
             left: `${leaf.left}%`,
@@ -272,8 +303,8 @@ function Leaves() {
 function Accent() {
   return (
     <LeafShape
-      lobed
-      className="mr-2 inline-block size-6 align-[-0.1em]"
+      kind="maple"
+      className="mr-2 inline-block size-8 align-[-0.2em]"
       style={{ color: '#c2571a' }}
     />
   )

@@ -79,7 +79,12 @@ export function ShortlistScreen() {
   useEffect(() => {
     if (!catalogDeps || !season) return
     let cancelled = false
-    loadTalesRow(catalogDeps, season, now)
+    loadTalesRow(
+      catalogDeps,
+      season,
+      now,
+      (picks ?? []).map((p) => p.entry.id),
+    )
       .then((row) => {
         if (!cancelled) setTales(row)
       })
@@ -87,7 +92,7 @@ export function ShortlistScreen() {
     return () => {
       cancelled = true
     }
-  }, [catalogDeps, season, now])
+  }, [catalogDeps, season, now, picks])
 
   useEffect(() => {
     let cancelled = false
@@ -177,7 +182,14 @@ export function ShortlistScreen() {
     dogEar.dismiss()
     if (season && tales.some((p) => p.entry.id === id)) {
       const previous = tales
-      removeTale(catalogDeps, season, previous, id, new Date())
+      removeTale(
+        catalogDeps,
+        season,
+        previous,
+        id,
+        new Date(),
+        (picks ?? []).map((p) => p.entry.id),
+      )
         .then((next) => {
           setTales(next)
           setRemoved({ key: Date.now(), workId: id, list: 'tales', previous })

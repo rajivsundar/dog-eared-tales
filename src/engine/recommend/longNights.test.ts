@@ -181,3 +181,42 @@ describe('the row', () => {
     ).toBe('ghost')
   })
 })
+
+describe('science fiction', () => {
+  it('stays out of the row unless it is also horror or a ghost story', () => {
+    const base = { moods: ['eerie'] }
+    expect(
+      isLongNightsTale(
+        entry('time-machine', {
+          ...base,
+          form: 'novella',
+          genres: ['science fiction', 'adventure'],
+        }),
+      ),
+    ).toBe(false)
+    expect(
+      isLongNightsTale(entry('a', { ...base, genres: ['science fiction'] })),
+    ).toBe(false)
+    expect(
+      isLongNightsTale(
+        entry('b', { ...base, genres: ['science fiction', 'horror'] }),
+      ),
+    ).toBe(true)
+    expect(
+      isLongNightsTale(
+        entry('c', { ...base, genres: ['science fiction', 'ghost story'] }),
+      ),
+    ).toBe(true)
+  })
+
+  it('keeps The Open Window (humour and satire, eerie mood)', () => {
+    expect(
+      isLongNightsTale(
+        entry('open-window', {
+          genres: ['humour', 'satire'],
+          moods: ['funny', 'eerie', 'whimsical'],
+        }),
+      ),
+    ).toBe(true)
+  })
+})

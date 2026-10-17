@@ -158,3 +158,72 @@ test('the Aa button sits next to the dog-ear button at every width', async ({
     expect(a.x - (d.x + d.width)).toBeLessThan(24)
   }
 })
+
+for (const [width, height, label] of [
+  [360, 780, '360 px'],
+  [1280, 800, 'desktop'],
+] as const) {
+  test(`the falling leaves never cross text or buttons (${label})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height })
+    await page.clock.setFixedTime(FALL)
+    await page.goto('/welcome')
+    await expect(page.getByTestId('season-leaves')).toBeVisible()
+    const container = page.getByTestId('season-leaves')
+    // The container is behind content and never takes a click.
+    expect(
+      await container.evaluate((el) => getComputedStyle(el).pointerEvents),
+    ).toBe('none')
+    const blocks = page.locator(
+      'h1, h1 ~ p, button, a, [data-testid="featured-story"], p',
+    )
+    for (let sample = 0; sample < 12; sample++) {
+      const hits = await page.evaluate(() => {
+        const rect = (el: Element) => el.getBoundingClientRect()
+        // What can be seen of each leaf: the container clips whatever is outside it.
+        const box = rect(
+          document.querySelector('[data-testid="season-leaves"]')!,
+        )
+        const leaves = [...document.querySelectorAll('.tt-leaf')]
+          .map(rect)
+          .map((r) => ({
+            left: Math.max(r.left, box.left),
+            right: Math.min(r.right, box.right),
+            top: Math.max(r.top, box.top),
+            bottom: Math.min(r.bottom, box.bottom),
+          }))
+          .filter((r) => r.right > r.left && r.bottom > r.top)
+        const text = [
+          ...document.querySelectorAll('main h1, main p, main button, main a'),
+        ]
+          .filter((el) => !el.closest('[data-testid="season-leaves"]'))
+          .map((el) => ({ name: el.textContent?.slice(0, 30), box: rect(el) }))
+        const out: string[] = []
+        for (const leaf of leaves) {
+          for (const t of text) {
+            const overlap =
+              leaf.left < t.box.right &&
+              leaf.right > t.box.left &&
+              leaf.top < t.box.bottom &&
+              leaf.bottom > t.box.top
+            if (overlap && t.box.width > 0) out.push(String(t.name))
+          }
+        }
+        return out
+      })
+      expect(hits, `sample ${sample}`).toEqual([])
+      await page.waitForTimeout(700)
+    }
+    // At 360 px the leaves are all above the wordmark.
+    if (width === 360) {
+      const wordmark = (await page
+        .getByText('Twice Told', { exact: true })
+        .first()
+        .boundingBox())!
+      const box = (await container.boundingBox())!
+      expect(box.y + box.height).toBeLessThanOrEqual(wordmark.y + 1)
+    }
+    void blocks
+  })
+}

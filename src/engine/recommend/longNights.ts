@@ -14,10 +14,14 @@ const FICTION = new Set(['story', 'novelette', 'novella'])
 /**
  * Fiction (a story, novelette or novella, never an essay) that is eerie, a ghost story or horror.
  * "Dark" counts only next to horror or mystery, so a dark satire such as A Modest Proposal stays out.
+ * Science fiction stays out too, unless it is also horror or a ghost story (so The Time Machine is out).
  */
 export function isLongNightsTale(entry: CatalogEntry): boolean {
   if (!FICTION.has(entry.form)) return false
   const has = (genre: string): boolean => entry.genres.includes(genre)
+  if (has('science fiction') && !has('horror') && !has('ghost story')) {
+    return false
+  }
   return (
     entry.moods.includes('eerie') ||
     has('ghost story') ||
