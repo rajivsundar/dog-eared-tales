@@ -738,3 +738,38 @@ describe('Raggylug', () => {
     expect(text).toContain('know just how and when to thump it.')
   })
 })
+
+describe('Wild Animals I Have Known ranges', () => {
+  const names = [
+    'LOBO',
+    'SILVERSPOT',
+    'RAGGYLUG',
+    'BINGO',
+    'SPRINGFIELD FOX',
+    'PACING MUSTANG',
+    'WULLY',
+    'REDRUFF',
+  ]
+
+  it('has all eight stories', () => {
+    const ids = result.base.filter((b) => b.id.startsWith('pg-3031-'))
+    expect(ids).toHaveLength(8)
+  })
+
+  it('no story ends with the next story’s half-title or rhyme', () => {
+    for (const story of result.base.filter((b) =>
+      b.id.startsWith('pg-3031-'),
+    )) {
+      const text = result.rangeText[story.id]
+      const tail = text.slice(-300)
+      if (!story.id.includes('bingo')) {
+        expect(text, story.id).not.toContain('Franckelyn')
+      }
+      for (const name of names) {
+        const own = story.id.toUpperCase().includes(name.replace(' ', '-'))
+        if (own) continue
+        expect(tail, story.id + ' ends with ' + name).not.toContain(name)
+      }
+    }
+  })
+})
