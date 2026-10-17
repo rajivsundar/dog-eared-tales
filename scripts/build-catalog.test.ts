@@ -478,7 +478,9 @@ function splitEntry(entry: CatalogEntry): {
 describe('curation in the catalog', () => {
   it('has complete, valid curation on every entry', () => {
     for (const e of result.entries) {
-      expect(e.year, e.id).toBeGreaterThan(1500)
+      expect(e.year, e.id).toBeGreaterThan(
+        e.yearBasis === 'composition-approx' ? -1000 : 1500,
+      )
       expect(eraBandFor(e.year), e.id).toBe(e.eraBand)
       expect(FORMS, e.id).toContain(e.form)
       expect(e.genres.length, e.id).toBeGreaterThanOrEqual(1)

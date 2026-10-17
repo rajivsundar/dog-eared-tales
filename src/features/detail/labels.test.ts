@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { readingLevelLabel } from './labels'
+import { readingLevelLabel, translationLabel, yearLabel } from './labels'
 
 describe('readingLevelLabel', () => {
   it('shows the band and the grade', () => {
@@ -31,5 +31,28 @@ describe('readingLevelLabel', () => {
     const level = { grade: 15, band: 'challenging' as const }
     readingLevelLabel(level)
     expect(level.grade).toBe(15)
+  })
+})
+
+describe('yearLabel and translationLabel', () => {
+  it('shows an ancient year as c. BCE or CE, and other years plainly', () => {
+    expect(yearLabel({ year: -500, yearBasis: 'composition-approx' })).toBe(
+      'c. 500 BCE',
+    )
+    expect(yearLabel({ year: 175, yearBasis: 'composition-approx' })).toBe(
+      'c. 175 CE',
+    )
+    expect(yearLabel({ year: 1894, yearBasis: 'first-print' })).toBe('1894')
+    expect(yearLabel({ year: 1894 })).toBe('1894')
+  })
+
+  it('names the translator and year, when recorded', () => {
+    expect(
+      translationLabel({ translator: 'Lionel Giles', translationYear: 1910 }),
+    ).toBe('Translated by Lionel Giles, 1910')
+    expect(translationLabel({ translator: 'Lionel Giles' })).toBe(
+      'Translated by Lionel Giles',
+    )
+    expect(translationLabel({})).toBe('')
   })
 })

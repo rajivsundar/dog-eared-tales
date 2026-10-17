@@ -30,7 +30,11 @@ export interface CatalogEntry {
   license: string
   year: number
   /** How the year was found; absent on records written before the field existed. */
-  yearBasis?: 'first-print' | 'collection-fallback' | 'unverified'
+  yearBasis?:
+    'first-print' | 'collection-fallback' | 'unverified' | 'composition-approx'
+  /** Who translated the text we ship, and when. */
+  translator?: string
+  translationYear?: number
   eraBand: string
   form: 'story' | 'novelette' | 'novella' | 'essay'
   genres: string[]

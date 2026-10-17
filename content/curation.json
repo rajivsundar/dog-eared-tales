@@ -1432,9 +1432,11 @@
       "review": "auto"
     },
     "pg-132-chapter-i-laying-plans": {
-      "year": 1910,
-      "yearBasis": "unverified",
-      "eraBand": "1900-1930",
+      "year": -500,
+      "yearBasis": "composition-approx",
+      "translator": "Lionel Giles",
+      "translationYear": 1910,
+      "eraBand": "pre-1800",
       "form": "essay",
       "genres": ["war", "philosophy"],
       "moods": ["tense", "thoughtful"],
@@ -1446,9 +1448,11 @@
       "review": "auto"
     },
     "pg-132-chapter-iii-attack-by-stratagem": {
-      "year": 1910,
-      "yearBasis": "unverified",
-      "eraBand": "1900-1930",
+      "year": -500,
+      "yearBasis": "composition-approx",
+      "translator": "Lionel Giles",
+      "translationYear": 1910,
+      "eraBand": "pre-1800",
       "form": "essay",
       "genres": ["war", "philosophy"],
       "moods": ["tense", "thoughtful"],
@@ -1460,9 +1464,11 @@
       "review": "auto"
     },
     "pg-132-chapter-vi-weak-points-and-strong": {
-      "year": 1910,
-      "yearBasis": "unverified",
-      "eraBand": "1900-1930",
+      "year": -500,
+      "yearBasis": "composition-approx",
+      "translator": "Lionel Giles",
+      "translationYear": 1910,
+      "eraBand": "pre-1800",
       "form": "essay",
       "genres": ["war", "philosophy"],
       "moods": ["tense", "thoughtful"],
@@ -1544,9 +1550,11 @@
       "review": "auto"
     },
     "pg-216-the-tao-teh-king": {
-      "year": 1891,
-      "yearBasis": "unverified",
-      "eraBand": "1850-1899",
+      "year": -400,
+      "yearBasis": "composition-approx",
+      "translator": "James Legge",
+      "translationYear": 1891,
+      "eraBand": "pre-1800",
       "form": "essay",
       "genres": ["philosophy", "spirituality"],
       "moods": ["thoughtful", "hopeful"],
@@ -1672,8 +1680,10 @@
       "review": "auto"
     },
     "pg-1656-apology": {
-      "year": 1513,
-      "yearBasis": "unverified",
+      "year": -399,
+      "yearBasis": "composition-approx",
+      "translator": "Benjamin Jowett",
+      "translationYear": 1871,
       "eraBand": "pre-1800",
       "form": "essay",
       "genres": ["philosophy", "history"],
@@ -1714,8 +1724,10 @@
       "review": "auto"
     },
     "pg-2680-the-second-book": {
-      "year": 1559,
-      "yearBasis": "first-print",
+      "year": 175,
+      "yearBasis": "composition-approx",
+      "translator": "Meric Casaubon",
+      "translationYear": 1634,
       "eraBand": "pre-1800",
       "form": "essay",
       "genres": ["philosophy", "spirituality"],
@@ -1728,8 +1740,10 @@
       "review": "auto"
     },
     "pg-2680-the-fourth-book": {
-      "year": 1559,
-      "yearBasis": "first-print",
+      "year": 175,
+      "yearBasis": "composition-approx",
+      "translator": "Meric Casaubon",
+      "translationYear": 1634,
       "eraBand": "pre-1800",
       "form": "essay",
       "genres": ["philosophy", "spirituality"],
@@ -1742,8 +1756,10 @@
       "review": "auto"
     },
     "pg-2680-the-sixth-book": {
-      "year": 1559,
-      "yearBasis": "first-print",
+      "year": 175,
+      "yearBasis": "composition-approx",
+      "translator": "Meric Casaubon",
+      "translationYear": 1634,
       "eraBand": "pre-1800",
       "form": "essay",
       "genres": ["philosophy", "spirituality"],

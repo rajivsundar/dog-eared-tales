@@ -91,6 +91,7 @@ export const YEAR_BASES = [
   'first-print',
   'collection-fallback',
   'unverified',
+  'composition-approx',
 ] as const
 
 export type Genre = (typeof GENRES)[number]
@@ -116,9 +117,13 @@ export interface Curation {
   /**
    * Optional. How the year was found: 'first-print' (confirmed first appearance in print),
    * 'collection-fallback' (the first book collection's year, because the periodical date could
-   * not be confirmed) or 'unverified' (not checked against a source).
+   * not be confirmed), 'unverified' (not checked against a source) or 'composition-approx'
+   * (an ancient work: the approximate year it was written; negative for BCE).
    */
   yearBasis?: YearBasis
+  /** Optional. Who translated the text we ship, and the year of that translation. */
+  translator?: string
+  translationYear?: number
   eraBand: EraBand
   form: Form
   genres: Genre[]
@@ -842,8 +847,21 @@ export function mergeCuration(
       !(YEAR_BASES as readonly unknown[]).includes(yearBasis)
     )
       fail(
-        `${where}: yearBasis must be "first-print", "collection-fallback" or "unverified"`,
+        `${where}: yearBasis must be "first-print", "collection-fallback", "unverified" or "composition-approx"`,
       )
+    const translator = r.translator
+    if (
+      translator !== undefined &&
+      (typeof translator !== 'string' || translator.trim() === '')
+    )
+      fail(`${where}: translator must be a name`)
+    const translationYear = r.translationYear
+    if (
+      translationYear !== undefined &&
+      (typeof translationYear !== 'number' ||
+        !Number.isInteger(translationYear))
+    )
+      fail(`${where}: translationYear must be a whole number`)
     const eraBand = r.eraBand
     if (!(ERA_BANDS as readonly unknown[]).includes(eraBand))
       fail(`${where}: eraBand is missing or not allowed`)
@@ -895,6 +913,8 @@ export function mergeCuration(
         readingLevel,
         year,
         ...(yearBasis !== undefined && { yearBasis: yearBasis as YearBasis }),
+        ...(translator !== undefined && { translator }),
+        ...(translationYear !== undefined && { translationYear }),
         eraBand: eraBand as EraBand,
         form: form as Form,
         genres: pickList(where, 'genres', r.genres, GENRES, 1, 3),

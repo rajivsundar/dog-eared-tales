@@ -4,6 +4,8 @@ import { OfflineBadge } from '../offline/OfflineBadge'
 import type { CatalogEntry } from '../../catalog'
 import {
   bookName,
+  translationLabel,
+  yearLabel,
   lengthLabel,
   minutesLabel,
   readingLevelLabel,
@@ -106,7 +108,8 @@ export function DetailSheet({
               </h2>
               <p className="mt-1 text-base">{entry.author}</p>
               <p className="mt-1 text-sm text-muted">
-                {entry.year}
+                {yearLabel(entry)}
+                {translationLabel(entry) && ` · ${translationLabel(entry)}`}
                 {entry.isCollection && ` · from ${bookName(entry)}`}
               </p>
               <p className="mt-2 text-sm font-medium text-accent">{reason}</p>

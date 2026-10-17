@@ -315,6 +315,23 @@ describe('schema errors still stop the build', () => {
     expect(() => merge({ yearBasis: 'guess' })).toThrow(/yearBasis must be/)
   })
 
+  it('accepts composition-approx, a negative year, and a translator', () => {
+    const [e] = merge({
+      year: -500,
+      eraBand: 'pre-1800',
+      yearBasis: 'composition-approx',
+      translator: 'Lionel Giles',
+      translationYear: 1910,
+    })
+    expect(e.year).toBe(-500)
+    expect(e.translator).toBe('Lionel Giles')
+    expect(e.translationYear).toBe(1910)
+    expect(() => merge({ translator: ' ' })).toThrow(/translator must be/)
+    expect(() => merge({ translationYear: '1910' })).toThrow(
+      /translationYear must be/,
+    )
+  })
+
   it('refuses a hook that is too long', () => {
     expect(() => merge({ hook: 'word '.repeat(21) })).toThrow(/limit is 20/)
   })
