@@ -20,6 +20,7 @@ import {
   formForWordCount,
   lengthClassFor,
   locate,
+  loadCuration,
   mergeCuration,
   parseCsv,
   readingBandFor,
@@ -465,14 +466,17 @@ describe('curation in the catalog', () => {
     expect(formForWordCount(17500)).toBe('novella')
   })
 
-  it('never copies six or more words in a row from the story into a hook or blurb', () => {
+  it('never copies six or more words in a row from the story into a hook or blurb (every curation record, shipped or not)', () => {
     const words = (s: string): string[] =>
       (
         s.match(
           /[A-Za-z0-9\u00C0-\uFFFF]+(?:['\u2019-][A-Za-z0-9\u00C0-\uFFFF]+)*/g,
         ) ?? []
       ).map((w) => w.toLowerCase().replace(/\u2019/g, "'"))
-    for (const e of result.entries) {
+    // Every record in curation.json, including the ones held back with reviewed: false.
+    const records = mergeCuration(result.base, loadCuration())
+    expect(records.length).toBeGreaterThanOrEqual(result.entries.length)
+    for (const e of records) {
       const text = words(result.rangeText[e.id])
       const grams = new Set<string>()
       for (let i = 0; i + 6 <= text.length; i++)
