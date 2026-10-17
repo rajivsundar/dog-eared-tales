@@ -404,37 +404,48 @@ describe('schema errors still stop the build', () => {
   })
 })
 
-describe('the 400 KB size rule', () => {
+describe('the size rule: 400 KB target, 1 MB cap', () => {
   const KB = 1024
-  it('holds back an AI-written record whose published book is over 400 KB, with the size', () => {
+  it('ships an AI-written record over the target but flags it, with the size', () => {
     const { shipped, heldBack, flagged } = decideShipping(
       [record('big'), record('small')],
       { big: STORY, small: STORY },
       { big: 457 * KB, small: 399 * KB },
     )
-    expect(shipped.map((e) => e.id)).toEqual(['small'])
-    expect(heldBack).toEqual([
-      {
-        id: 'big',
-        reasons: ['the published book is 457 KB, over the 400 KB limit'],
-      },
-    ])
-    expect(flagged).toEqual([])
+    expect(shipped.map((e) => e.id)).toEqual(['big', 'small'])
+    expect(heldBack).toEqual([])
+    expect(flagged).toEqual([{ id: 'big', bytes: 457 * KB, limit: 'target' }])
   })
 
-  it('flags a human-reviewed record that is over the limit but still ships it', () => {
+  it('holds back an AI-written record over the 1 MB cap, with the size', () => {
+    const { shipped, heldBack } = decideShipping(
+      [record('huge'), record('ok')],
+      { huge: STORY, ok: STORY },
+      { huge: 1100 * KB, ok: 1024 * KB },
+    )
+    expect(shipped.map((e) => e.id)).toEqual(['ok'])
+    expect(heldBack).toEqual([
+      {
+        id: 'huge',
+        reasons: ['the published book is 1100 KB, over the 1 MB cap'],
+      },
+    ])
+  })
+
+  it('flags a human-reviewed record over the cap but still ships it', () => {
     const { shipped, heldBack, flagged } = decideShipping(
       [record('a', { review: 'human', reviewed: true })],
       { a: STORY },
-      { a: 961 * KB },
+      { a: 1500 * KB },
     )
     expect(shipped.map((e) => e.id)).toEqual(['a'])
     expect(heldBack).toEqual([])
-    expect(flagged).toEqual([{ id: 'a', bytes: 961 * KB }])
+    expect(flagged).toEqual([{ id: 'a', bytes: 1500 * KB, limit: 'cap' }])
   })
 
   it('applies no size rule when sizes are not given', () => {
-    const { shipped } = decideShipping([record('a')], { a: STORY })
+    const { shipped, flagged } = decideShipping([record('a')], { a: STORY })
     expect(shipped.map((e) => e.id)).toEqual(['a'])
+    expect(flagged).toEqual([])
   })
 })

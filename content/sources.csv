@@ -1,4 +1,4 @@
-file,story_title,source,source_url,story_href,story_end_href,story_author,startAtText,endBeforeText
+file,story_title,source,source_url,story_href,story_end_href,story_author,startAtText,endBeforeText,pictureBook
 pg-35-the-time-machine.epub,The Time Machine,Project Gutenberg,https://www.gutenberg.org/ebooks/35,,,
 pg-71-civil-disobedience.epub,On the Duty of Civil Disobedience,Project Gutenberg,https://www.gutenberg.org/ebooks/71,,,
 pg-269-beasts-and-super-beasts.epub,The Open Window,Project Gutenberg,https://www.gutenberg.org/ebooks/269,OEBPS/3659347803332945271_269-h-0.htm.xhtml#pgepubid00007,OEBPS/3659347803332945271_269-h-0.htm.xhtml#pgepubid00008,
@@ -179,9 +179,9 @@ pg-7766-a-dog-of-flanders.epub,A Dog of Flanders,Project Gutenberg,https://www.g
 pg-215-the-call-of-the-wild.epub,The Call of the Wild,Project Gutenberg,https://www.gutenberg.org/ebooks/215,,,
 pg-910-white-fang.epub,White Fang,Project Gutenberg,https://www.gutenberg.org/ebooks/910,,,
 pg-2852-the-hound-of-the-baskervilles.epub,The Hound of the Baskervilles,Project Gutenberg,https://www.gutenberg.org/ebooks/2852,,,
-pg-14838-the-tale-of-peter-rabbit.epub,The Tale of Peter Rabbit,Project Gutenberg,https://www.gutenberg.org/ebooks/14838,,,
-pg-14407-the-tale-of-benjamin-bunny.epub,The Tale of Benjamin Bunny,Project Gutenberg,https://www.gutenberg.org/ebooks/14407,,,
-pg-14814-the-tale-of-jemima-puddle-duck.epub,The Tale of Jemima Puddle-Duck,Project Gutenberg,https://www.gutenberg.org/ebooks/14814,OEBPS/7285663678339061143_14814-h-0.htm.xhtml#pgepubid00001,,
+pg-14838-the-tale-of-peter-rabbit.epub,The Tale of Peter Rabbit,Project Gutenberg,https://www.gutenberg.org/ebooks/14838,,,,,,true
+pg-14407-the-tale-of-benjamin-bunny.epub,The Tale of Benjamin Bunny,Project Gutenberg,https://www.gutenberg.org/ebooks/14407,,,,,,true
+pg-14814-the-tale-of-jemima-puddle-duck.epub,The Tale of Jemima Puddle-Duck,Project Gutenberg,https://www.gutenberg.org/ebooks/14814,OEBPS/7285663678339061143_14814-h-0.htm.xhtml#pgepubid00001,,,,,true
 pg-38777-lad-a-dog.epub,Lad: A Dog,Project Gutenberg,https://www.gutenberg.org/ebooks/38777,OEBPS/4313263416278529056_38777-h-0.htm.html#pgepubid00011,,,,The following is a list of changes made to the original.
 pg-2795-bob-son-of-battle.epub,"Bob, Son of Battle",Project Gutenberg,https://www.gutenberg.org/ebooks/2795,,,
 pg-2818-beautiful-joe-an-autobiography.epub,Beautiful Joe,Project Gutenberg,https://www.gutenberg.org/ebooks/2818,,,

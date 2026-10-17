@@ -25,8 +25,10 @@ const OUT_CATALOG = path.join(ROOT, 'public', 'catalog')
 const OUT_TEXTS = path.join(ROOT, 'public', 'texts')
 const OUT_COVERS = path.join(ROOT, 'public', 'covers')
 
-/** A published EPUB over this many bytes is held back (an AI-written record) or flagged (a human-reviewed one). */
-export const MAX_EPUB_BYTES = 400 * 1024
+/** The size a published EPUB should stay under. Above it, the build flags the book; it still ships. */
+export const TARGET_EPUB_BYTES = 400 * 1024
+/** The hard cap. Above it an AI-written record is held back; a human-reviewed one is flagged and still ships. */
+export const CAP_EPUB_BYTES = 1024 * 1024
 const WORDS_PER_MINUTE = 238
 const LICENSE = 'Project Gutenberg License'
 /** The media type of an EPUB 2 table of contents. */
@@ -186,8 +188,8 @@ export interface BuildResult {
   entries: CatalogEntry[]
   /** AI-written records held back because they failed an automated check, with the reasons. */
   heldBack: { id: string; reasons: string[] }[]
-  /** Records that ship although their published book is over the size limit (human-reviewed). */
-  flagged: { id: string; bytes: number }[]
+  /** Records that ship although their published book is over the 400 KB target (or, if human-reviewed, the 1 MB cap). */
+  flagged: SizeFlag[]
   /** Every row of sources.csv, built and checked, whether or not it ships. */
   base: BaseEntry[]
   /** Rows that do not ship: no curation record, not yet reviewed by a person, or held back. */
@@ -954,6 +956,13 @@ const REQUIRED_CSV = ['file', 'story_title', 'source', 'source_url']
  * marked reviewed: true. An AI-written record (review "auto") ships if it passes every automated
  * check; if it fails one it is held back, and the reasons are returned so the build can list them.
  */
+/** A record whose published book is over the size target (or the cap), but which still ships. */
+export interface SizeFlag {
+  id: string
+  bytes: number
+  limit: 'target' | 'cap'
+}
+
 export function decideShipping(
   records: CatalogEntry[],
   rangeText: Record<string, string>,
@@ -962,28 +971,37 @@ export function decideShipping(
 ): {
   shipped: CatalogEntry[]
   heldBack: { id: string; reasons: string[] }[]
-  flagged: { id: string; bytes: number }[]
+  flagged: SizeFlag[]
 } {
   const shipped: CatalogEntry[] = []
   const heldBack: { id: string; reasons: string[] }[] = []
-  const flagged: { id: string; bytes: number }[] = []
+  const flagged: SizeFlag[] = []
   for (const record of records) {
     const bytes = bookBytes[record.id]
-    const tooBig = bytes !== undefined && bytes > MAX_EPUB_BYTES
+    const overCap = bytes !== undefined && bytes > CAP_EPUB_BYTES
+    const overTarget = bytes !== undefined && bytes > TARGET_EPUB_BYTES
     if (record.review === 'human') {
       if (record.reviewed) {
         shipped.push(record)
-        if (tooBig) flagged.push({ id: record.id, bytes })
+        if (overTarget)
+          flagged.push({
+            id: record.id,
+            bytes,
+            limit: overCap ? 'cap' : 'target',
+          })
       }
       continue
     }
     const reasons = automatedCheckProblems(record, rangeText[record.id] ?? '')
-    if (tooBig)
+    if (overCap)
       reasons.push(
-        `the published book is ${Math.round(bytes / 1024)} KB, over the ${MAX_EPUB_BYTES / 1024} KB limit`,
+        `the published book is ${Math.round(bytes / 1024)} KB, over the ${CAP_EPUB_BYTES / 1024 / 1024} MB cap`,
       )
-    if (reasons.length === 0) shipped.push(record)
-    else heldBack.push({ id: record.id, reasons })
+    if (reasons.length === 0) {
+      shipped.push(record)
+      if (overTarget) flagged.push({ id: record.id, bytes, limit: 'target' })
+    }
+    if (reasons.length > 0) heldBack.push({ id: record.id, reasons })
   }
   return { shipped, heldBack, flagged }
 }
@@ -1183,18 +1201,35 @@ export function buildCatalog(options: BuildOptions = {}): BuildResult {
 const EPUB_CACHE = path.join(ROOT, '.cache', 'epubs')
 
 /** The copy of a raw EPUB that is published: its images scaled down (see scripts/shrinkEpub.ts). */
-export async function publishedEpub(file: string): Promise<Uint8Array> {
+/** The raw EPUB files that sources.csv marks as picture books (pictureBook = true). */
+export function pictureBookFiles(): Set<string> {
+  const rows = parseCsv(readFileSync(SOURCES_CSV, 'utf8'))
+  return new Set(
+    rows
+      .filter((r) => r.pictureBook?.trim().toLowerCase() === 'true')
+      .map((r) => r.file),
+  )
+}
+
+export async function publishedEpub(
+  file: string,
+  pictureBook = false,
+): Promise<Uint8Array> {
   const raw = readFileSync(path.join(RAW_DIR, file))
   const key = createHash('sha256').update(raw).digest('hex').slice(0, 24)
-  const cached = path.join(EPUB_CACHE, `${key}-v${SHRINK_VERSION}.epub`)
+  const cached = path.join(
+    EPUB_CACHE,
+    `${key}-v${SHRINK_VERSION}${pictureBook ? 'p' : ''}.epub`,
+  )
   if (existsSync(cached)) return new Uint8Array(readFileSync(cached))
-  const shrunk = await shrinkEpub(new Uint8Array(raw))
+  const shrunk = await shrinkEpub(new Uint8Array(raw), pictureBook)
   mkdirSync(EPUB_CACHE, { recursive: true })
   writeFileSync(cached, shrunk)
   return shrunk
 }
 
 async function writeOutputs({ entries, epubs }: BuildResult): Promise<void> {
+  const pictureBooks = pictureBookFiles()
   for (const dir of [OUT_CATALOG, OUT_TEXTS, OUT_COVERS]) {
     rmSync(dir, { recursive: true, force: true })
     mkdirSync(dir, { recursive: true })
@@ -1202,7 +1237,7 @@ async function writeOutputs({ entries, epubs }: BuildResult): Promise<void> {
   for (const [number, file] of epubs) {
     writeFileSync(
       path.join(OUT_TEXTS, `pg-${number}.epub`),
-      await publishedEpub(file),
+      await publishedEpub(file, pictureBooks.has(file)),
     )
   }
   for (const e of entries) {
@@ -1264,8 +1299,10 @@ async function main(): Promise<void> {
     }
     // Shrink every book first, so the size rule sees the size that would be published.
     const sizes = new Map<string, number>()
+    const pictureBooks = pictureBookFiles()
     for (const f of readdirSync(RAW_DIR)) {
-      if (f.endsWith('.epub')) sizes.set(f, (await publishedEpub(f)).length)
+      if (f.endsWith('.epub'))
+        sizes.set(f, (await publishedEpub(f, pictureBooks.has(f))).length)
     }
     const result = buildCatalog({ publishedBytes: (f) => sizes.get(f) })
     await writeOutputs(result)
@@ -1276,7 +1313,10 @@ async function main(): Promise<void> {
     }
     for (const f of result.flagged) {
       console.warn(
-        `catalog: FLAGGED ${f.id}: the published book is ${Math.round(f.bytes / 1024)} KB, over the ${MAX_EPUB_BYTES / 1024} KB limit (human-reviewed, still shipped)`,
+        `catalog: FLAGGED ${f.id}: the published book is ${Math.round(f.bytes / 1024)} KB, over the ` +
+          (f.limit === 'cap'
+            ? `${CAP_EPUB_BYTES / 1024 / 1024} MB cap (human-reviewed, still shipped)`
+            : `${TARGET_EPUB_BYTES / 1024} KB target (still shipped)`),
       )
     }
     const held = result.skipped.length

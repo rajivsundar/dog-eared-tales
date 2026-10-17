@@ -2,7 +2,7 @@
 import sharp from 'sharp'
 import { unzipSync, zipSync } from 'fflate'
 import { describe, expect, it } from 'vitest'
-import { MAX_EDGE, shrinkEpub } from './shrinkEpub.ts'
+import { MAX_EDGE, PICTURE_BOOK_EDGE, shrinkEpub } from './shrinkEpub.ts'
 
 async function fakeBook(): Promise<Uint8Array> {
   const noise = (w: number, h: number): Buffer => {
@@ -78,5 +78,27 @@ describe('shrinking the images of an EPUB', () => {
     }
     const small = await sharp(after['OEBPS/small.jpg']).metadata()
     expect([small.width, small.height]).toEqual([40, 30])
+  })
+
+  it('shrinks a picture book harder: 600 px, and a PNG palette of at most 128 colours', async () => {
+    const original = await fakeBook()
+    const normal = unzipSync(await shrinkEpub(original))
+    const picture = unzipSync(await shrinkEpub(original, true))
+    const photo = await sharp(picture['OEBPS/photo.jpg']).metadata()
+    expect(photo.format).toBe('jpeg')
+    expect(Math.max(photo.width!, photo.height!)).toBe(PICTURE_BOOK_EDGE)
+    expect(picture['OEBPS/photo.jpg'].length).toBeLessThan(
+      normal['OEBPS/photo.jpg'].length,
+    )
+    const drawing = await sharp(picture['OEBPS/drawing.png']).metadata()
+    expect(drawing.format).toBe('png')
+    expect(drawing.width).toBe(PICTURE_BOOK_EDGE)
+    expect(Object.keys(picture)).toEqual(Object.keys(normal))
+    expect(
+      Buffer.compare(
+        Buffer.from(picture['OEBPS/page.xhtml']),
+        Buffer.from(normal['OEBPS/page.xhtml']),
+      ),
+    ).toBe(0)
   })
 })
