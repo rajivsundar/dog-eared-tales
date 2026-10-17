@@ -1,5 +1,12 @@
 import { expect, test } from '@playwright/test'
-import { startApp, turnForward, waitForReader, mapProfileDb } from './helpers'
+import {
+  expectPlaceHolds,
+  mapProfileDb,
+  readToEnd,
+  startApp,
+  turnForward,
+  waitForReader,
+} from './helpers'
 
 test.beforeEach(async ({ page }) => {
   await mapProfileDb(page)
@@ -168,8 +175,7 @@ test('the reader has a dog-ear button that does not move the reading position', 
   await expect(page.getByRole('status')).toContainText('Removed')
   await page.getByRole('button', { name: 'Undo' }).click()
   await expect(page.getByRole('button', { name: 'Dog-eared' })).toBeVisible()
-  await page.waitForTimeout(400)
-  await expect(reader).toHaveAttribute('data-locator', place ?? '')
+  await expectPlaceHolds(page, place ?? '')
 })
 
 test('the end-of-story check-in records a rating, and the Library can rate later', async ({
@@ -179,11 +185,7 @@ test('the end-of-story check-in records a rating, and the Library can rate later
   await page.goto(`/read/${id}`)
   await waitForReader(page)
   const reader = page.getByTestId('reader')
-  for (let i = 0; i < 40; i++) {
-    if ((await reader.getAttribute('data-phase')) === 'finished') break
-    await page.keyboard.press('ArrowRight')
-    await page.waitForTimeout(150)
-  }
+  await readToEnd(page)
   await expect(reader).toHaveAttribute('data-phase', 'finished')
   const end = page.getByTestId('end-screen')
   await end.getByRole('button', { name: 'Not for me' }).click()

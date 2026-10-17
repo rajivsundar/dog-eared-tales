@@ -1014,10 +1014,50 @@ function writeOutputs({ entries, epubs }: BuildResult): void {
   )
 }
 
+/** Where the last build's input hash is kept (not committed). */
+const CACHE_FILE = path.join(ROOT, '.cache', 'catalog.key')
+
+/** Every file in a folder, in a fixed order, as relative paths. */
+function filesIn(dir: string, base = dir): string[] {
+  return readdirSync(dir, { withFileTypes: true })
+    .flatMap((d) =>
+      d.isDirectory()
+        ? filesIn(path.join(dir, d.name), base)
+        : [path.relative(base, path.join(dir, d.name))],
+    )
+    .sort()
+}
+
+/** A hash of everything the build reads: content/ (names and bytes) and this script. */
+export function inputHash(): string {
+  const hash = createHash('sha256')
+  const content = path.join(ROOT, 'content')
+  for (const file of filesIn(content)) {
+    hash.update(file + ' ')
+    hash.update(readFileSync(path.join(content, file)))
+  }
+  hash.update(readFileSync(fileURLToPath(import.meta.url)))
+  return hash.digest('hex')
+}
+
 function main(): void {
   try {
+    // Unchanged inputs and outputs still there: skip reading every EPUB again.
+    const key = inputHash()
+    const made = path.join(ROOT, 'public', 'catalog', 'catalog.json')
+    if (
+      !process.env.CATALOG_FORCE &&
+      existsSync(made) &&
+      existsSync(CACHE_FILE) &&
+      readFileSync(CACHE_FILE, 'utf8') === key
+    ) {
+      console.log('catalog: unchanged, skipped (CATALOG_FORCE=1 rebuilds)')
+      return
+    }
     const result = buildCatalog()
     writeOutputs(result)
+    mkdirSync(path.dirname(CACHE_FILE), { recursive: true })
+    writeFileSync(CACHE_FILE, key)
     const held = result.skipped.length
     console.log(
       `catalog: ${result.entries.length} entries from ${result.epubs.size} EPUBs -> public/catalog/catalog.json` +

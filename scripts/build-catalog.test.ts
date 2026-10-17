@@ -604,3 +604,12 @@ describe('reading level', () => {
     }
   })
 })
+
+describe('the build cache key', () => {
+  it('is a stable hash of content/ and the script, so unchanged inputs skip the build', async () => {
+    const { inputHash } = await import('./build-catalog.ts')
+    const first = inputHash()
+    expect(first).toMatch(/^[0-9a-f]{64}$/)
+    expect(inputHash()).toBe(first)
+  })
+})

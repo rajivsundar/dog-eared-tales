@@ -175,12 +175,15 @@ for (const [width, height, label] of [
     expect(
       await container.evaluate((el) => getComputedStyle(el).pointerEvents),
     ).toBe('none')
-    const blocks = page.locator(
-      'h1, h1 ~ p, button, a, [data-testid="featured-story"], p',
-    )
-    for (let sample = 0; sample < 12; sample++) {
-      const hits = await page.evaluate(() => {
-        const rect = (el: Element) => el.getBoundingClientRect()
+    // Instead of waiting for the animation, move it to many points in its cycle (the Web Animations
+    // API) and look at where the leaves are at each one.
+    const hits = await page.evaluate(() => {
+      const rect = (el: Element) => el.getBoundingClientRect()
+      const animations = document.getAnimations()
+      for (const a of animations) a.pause()
+      const out: string[] = []
+      for (let ms = 0; ms <= 20000; ms += 250) {
+        for (const a of animations) a.currentTime = ms
         // What can be seen of each leaf: the container clips whatever is outside it.
         const box = rect(
           document.querySelector('[data-testid="season-leaves"]')!,
@@ -199,7 +202,6 @@ for (const [width, height, label] of [
         ]
           .filter((el) => !el.closest('[data-testid="season-leaves"]'))
           .map((el) => ({ name: el.textContent?.slice(0, 30), box: rect(el) }))
-        const out: string[] = []
         for (const leaf of leaves) {
           for (const t of text) {
             const overlap =
@@ -207,14 +209,14 @@ for (const [width, height, label] of [
               leaf.right > t.box.left &&
               leaf.top < t.box.bottom &&
               leaf.bottom > t.box.top
-            if (overlap && t.box.width > 0) out.push(String(t.name))
+            if (overlap && t.box.width > 0) out.push(`${t.name} at ${ms} ms`)
           }
         }
-        return out
-      })
-      expect(hits, `sample ${sample}`).toEqual([])
-      await page.waitForTimeout(700)
-    }
+      }
+      return { out, animated: animations.length }
+    })
+    expect(hits.animated).toBeGreaterThanOrEqual(5) // the leaves really are animated
+    expect(hits.out).toEqual([])
     // At 360 px the leaves are all above the wordmark.
     if (width === 360) {
       const wordmark = (await page
@@ -224,6 +226,5 @@ for (const [width, height, label] of [
       const box = (await container.boundingBox())!
       expect(box.y + box.height).toBeLessThanOrEqual(wordmark.y + 1)
     }
-    void blocks
   })
 }

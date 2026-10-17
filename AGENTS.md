@@ -6,6 +6,13 @@
 - Keep each change small. After each change, tell me exactly how to check it works.
 - I work on Windows in PowerShell. Give me PowerShell commands.
 
+## Running checks
+
+- During a step, run only what the change touches: `npm run typecheck`, `npm run lint`, the Vitest tests related to the changed files (`npx vitest related --run <files>`), and only the affected Playwright specs (`npx playwright test e2e/<name>.spec.ts`).
+- Run the full suite (`npm test` and `npm run e2e`) once, just before committing. GitHub Actions runs everything on every push anyway.
+- Playwright starts and stops its own preview server (`scripts/e2e-server.mjs`); it never reuses a server it did not start. If port 4173 is busy, it says so and stops. Do not start extra preview servers by hand, and stop any you did start before running the tests.
+- Waiting in end-to-end tests is done with `expect` (or `expect.poll`), never with fixed `waitForTimeout` pauses.
+
 ## Stack
 
 - Vite + React + TypeScript + Tailwind CSS

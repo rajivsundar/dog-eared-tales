@@ -9,3 +9,4 @@ public/covers/
 
 # Word lock files
 ~$*
+.cache/

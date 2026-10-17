@@ -13,13 +13,42 @@ export async function shippedCount(
 export async function turnForward(page: Page): Promise<void> {
   const reader = page.getByTestId('reader')
   const before = (await reader.getAttribute('data-locator')) ?? ''
-  // A key pressed while the previous page is still settling is ignored, so press again if needed.
-  for (let attempt = 0; attempt < 12; attempt++) {
-    await page.keyboard.press('ArrowRight')
-    await page.waitForTimeout(250)
-    if ((await reader.getAttribute('data-locator')) !== before) return
-  }
-  throw new Error('the page did not turn')
+  // A key pressed while the previous page is still settling is ignored, so press again until it turns.
+  await expect
+    .poll(
+      async () => {
+        await page.keyboard.press('ArrowRight')
+        return (await reader.getAttribute('data-locator')) ?? ''
+      },
+      { intervals: [100, 150, 250], timeout: 8000 },
+    )
+    .not.toBe(before)
+}
+
+/** Presses Next until the story's end screen is up (a key during a page turn is ignored). */
+export async function readToEnd(page: Page): Promise<void> {
+  const reader = page.getByTestId('reader')
+  await expect
+    .poll(
+      async () => {
+        const phase = await reader.getAttribute('data-phase')
+        if (phase !== 'finished') await page.keyboard.press('ArrowRight')
+        return phase
+      },
+      { intervals: [100, 150], timeout: 20000 },
+    )
+    .toBe('finished')
+}
+
+/** Asserts the reader's position does not move for a moment (for "Previous goes nowhere"). */
+export async function expectPlaceHolds(
+  page: Page,
+  locator: string,
+): Promise<void> {
+  const reader = page.getByTestId('reader')
+  await expect(async () => {
+    expect(await reader.getAttribute('data-locator')).not.toBe(locator)
+  }).not.toPass({ timeout: 400, intervals: [50] })
 }
 
 /** Waits for the reader to be ready on its first page. */

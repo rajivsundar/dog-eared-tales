@@ -1,6 +1,12 @@
 import { type Page, expect, test } from '@playwright/test'
 import { buildCatalog } from '../scripts/build-catalog.ts'
-import { shippedCount, turnForward, mapProfileDb } from './helpers'
+import {
+  expectPlaceHolds,
+  mapProfileDb,
+  readToEnd,
+  shippedCount,
+  turnForward,
+} from './helpers'
 
 // ---------------------------------------------------------------- helpers
 
@@ -137,8 +143,7 @@ test('a story inside a collection starts at its own title, not the book’s titl
   const reader = page.getByTestId('reader')
   const locator = await reader.getAttribute('data-locator')
   await page.keyboard.press('ArrowLeft')
-  await page.waitForTimeout(400)
-  await expect(reader).toHaveAttribute('data-locator', locator ?? '')
+  await expectPlaceHolds(page, locator ?? '')
   await expect(
     page.getByText(/from The Adventures of Sherlock Holmes/),
   ).toBeVisible()
@@ -164,11 +169,7 @@ test('reaching the end of a story shows the end screen and logs it as finished',
 }) => {
   await openStory(page, 'pg-269-the-open-window')
   const reader = page.getByTestId('reader')
-  for (let i = 0; i < 40; i++) {
-    if ((await reader.getAttribute('data-phase')) === 'finished') break
-    await page.keyboard.press('ArrowRight')
-    await page.waitForTimeout(150)
-  }
+  await readToEnd(page)
   await expect(reader).toHaveAttribute('data-phase', 'finished')
   const end = page.getByTestId('end-screen')
   await expect(end).toContainText('The Open Window')
@@ -256,13 +257,16 @@ test('tapping the left and right of the page turns it, and the progress bar foll
   /** Taps a zone until the page changes (a tap during a page turn is ignored). */
   const tap = async (name: 'Next page' | 'Previous page'): Promise<string> => {
     const was = (await reader.getAttribute('data-locator')) ?? ''
-    for (let attempt = 0; attempt < 12; attempt++) {
-      await page.getByRole('button', { name }).click()
-      await page.waitForTimeout(250)
-      const now = (await reader.getAttribute('data-locator')) ?? ''
-      if (now !== was) return now
-    }
-    throw new Error(`tapping "${name}" did not turn the page`)
+    await expect
+      .poll(
+        async () => {
+          await page.getByRole('button', { name }).click()
+          return (await reader.getAttribute('data-locator')) ?? ''
+        },
+        { intervals: [100, 150, 250], timeout: 8000 },
+      )
+      .not.toBe(was)
+    return (await reader.getAttribute('data-locator')) ?? ''
   }
 
   await tap('Next page')
@@ -323,16 +327,11 @@ test('an EPUB 2 story (Miss Brill, pg-1429) starts at its title and stops at its
   const reader = page.getByTestId('reader')
   const locator = await reader.getAttribute('data-locator')
   await page.keyboard.press('ArrowLeft')
-  await page.waitForTimeout(400)
-  await expect(reader).toHaveAttribute('data-locator', locator ?? '')
+  await expectPlaceHolds(page, locator ?? '')
 
   // It stops at its end: the story's last words, then the end screen, never the next story.
   expect(chapter).not.toContain('Her First Ball')
-  for (let i = 0; i < 40; i++) {
-    if ((await reader.getAttribute('data-phase')) === 'finished') break
-    await page.keyboard.press('ArrowRight')
-    await page.waitForTimeout(150)
-  }
+  await readToEnd(page)
   await expect(reader).toHaveAttribute('data-phase', 'finished')
   await expect(page.getByTestId('end-screen')).toContainText('Miss Brill')
   expect(await sectionText(page)).not.toContain('Her First Ball')

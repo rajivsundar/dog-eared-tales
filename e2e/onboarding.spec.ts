@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { startApp, mapProfileDb } from './helpers'
+import { mapProfileDb, readToEnd, startApp } from './helpers'
 
 /** Reads every record in one of the app's IndexedDB stores. */
 function readStore(
@@ -181,11 +181,7 @@ test('"Read a short story now": read the story, rate it, land on Your Shortlist,
   expect(await readStore(page, 'profile')).toHaveLength(1)
 
   // Read to the end.
-  for (let i = 0; i < 40; i++) {
-    if ((await reader.getAttribute('data-phase')) === 'finished') break
-    await page.keyboard.press('ArrowRight')
-    await page.waitForTimeout(150)
-  }
+  await readToEnd(page)
   await expect(reader).toHaveAttribute('data-phase', 'finished')
 
   // The existing check-in seeds the profile.

@@ -66,15 +66,36 @@ export default defineConfig({
     }),
   ],
   test: {
+    // Worker threads start faster than child processes, and tests share one machine's cores.
+    pool: 'threads',
+    globals: true,
+    projects: [
+      {
+        extends: true,
+        test: {
+          // Pure logic (the recommender, the stores over fake-indexeddb, the catalog build)
+          // needs no browser, so it runs in plain Node.
+          name: 'unit',
+          environment: 'node',
+          include: ['src/**/*.test.ts', 'scripts/**/*.test.ts'],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          // Components need a DOM.
+          name: 'components',
+          environment: 'jsdom',
+          include: ['src/**/*.test.tsx'],
+          setupFiles: ['./src/test-setup.ts'],
+        },
+      },
+    ],
     // There is no service worker in unit tests, so the PWA hook is replaced by a stub.
     alias: {
       'virtual:pwa-register/react': fileURLToPath(
         new URL('./src/pwa/registerStub.ts', import.meta.url),
       ),
     },
-    globals: true,
-    environment: 'jsdom',
-    setupFiles: ['./src/test-setup.ts'],
-    include: ['src/**/*.test.{ts,tsx}', 'scripts/**/*.test.ts'],
   },
 })
