@@ -728,3 +728,13 @@ describe('cutting a story at some text', () => {
     expect(text.trimEnd().endsWith('at a railway station.”')).toBe(true)
   })
 })
+
+describe('Raggylug', () => {
+  it('ends before the next story’s half-title and rhyme', () => {
+    const rag = result.base.find((b) => b.id.startsWith('pg-3031-raggylug'))!
+    expect(rag.endBeforeText).toBe('BINGO')
+    const text = result.rangeText[rag.id]
+    expect(text).not.toContain('Franckelyn')
+    expect(text).toContain('know just how and when to thump it.')
+  })
+})
