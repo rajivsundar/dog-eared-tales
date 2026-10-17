@@ -1,14 +1,21 @@
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { clearTextCache } from '../../pwa/textCache'
-import { type BackupFile, BackupError, dataStore } from '../../stores'
+import { profileManager } from '../../stores'
+import { type BackupFile, BackupError } from '../../stores/backup'
+import { ProfileError } from '../../stores/profileManager'
+import { MAX_READING_PROFILES } from '../../stores/types'
+import { useProfiles } from '../profiles/useProfiles'
 import {
   DELETE_WORD,
+  addBackupAsProfile,
   deleteAllData,
   downloadTextFile,
+  makeAllProfilesBackup,
   makeBackup,
   readBackupFile,
-  restoreBackup,
+  replaceEverythingFromBackup,
+  replaceProfileFromBackup,
 } from './dataActions'
 
 const button =
@@ -19,8 +26,13 @@ const danger =
 /** Settings → Your data: export a backup, import one, or delete everything. */
 export function DataSection() {
   const navigate = useNavigate()
+  const snapshot = useProfiles()
+  const many = snapshot.profiles.length >= 2
+  const openName = snapshot.active?.name ?? 'Guest'
   const fileInput = useRef<HTMLInputElement>(null)
   const [pending, setPending] = useState<BackupFile | null>(null)
+  // "Replace this profile" asks a second time.
+  const [confirmReplace, setConfirmReplace] = useState(false)
   const [message, setMessage] = useState<{
     text: string
     error: boolean
@@ -30,57 +42,62 @@ export function DataSection() {
   const [busy, setBusy] = useState(false)
 
   const say = (text: string, error = false): void => setMessage({ text, error })
+  const cancelImport = (): void => {
+    setPending(null)
+    setConfirmReplace(false)
+  }
+  const problem = (error: unknown, fallback: string): void => {
+    if (!(error instanceof BackupError) && !(error instanceof ProfileError)) {
+      console.error(error)
+    }
+    say(
+      error instanceof BackupError || error instanceof ProfileError
+        ? error.message
+        : fallback,
+      true,
+    )
+  }
 
-  const onExport = (): void => {
+  const save = (made: Promise<{ filename: string; text: string }>): void => {
     setMessage(null)
-    makeBackup(dataStore)
+    made
       .then(({ filename, text }) => {
         downloadTextFile(filename, text)
         say(`Saved ${filename}.`)
       })
-      .catch((error: unknown) => {
-        console.error(error)
-        say('We couldn’t make the backup.', true)
-      })
+      .catch((error: unknown) => problem(error, 'We couldn’t make the backup.'))
   }
 
   const onFile = (file: File | undefined): void => {
     setMessage(null)
-    setPending(null)
+    cancelImport()
     if (!file) return
     readBackupFile(file)
       .then(setPending)
-      .catch((error: unknown) => {
-        say(
-          error instanceof BackupError
-            ? error.message
-            : 'We couldn’t read that file.',
-          true,
-        )
-      })
+      .catch((error: unknown) => problem(error, 'We couldn’t read that file.'))
     if (fileInput.current) fileInput.current.value = ''
   }
 
-  const onRestore = (): void => {
-    if (!pending || busy) return
+  const finish = (task: Promise<unknown>, done: () => void): void => {
     setBusy(true)
-    restoreBackup(dataStore, pending)
+    task
       .then(() => {
-        setPending(null)
-        say('Backup restored.')
-        navigate('/')
+        cancelImport()
+        done()
       })
-      .catch((error: unknown) => {
-        console.error(error)
-        say('We couldn’t restore that backup. Nothing was changed.', true)
-      })
+      .catch((error: unknown) =>
+        problem(error, 'We couldn’t restore that backup. Nothing was changed.'),
+      )
       .finally(() => setBusy(false))
   }
 
   const onDelete = (): void => {
     if (typed !== DELETE_WORD || busy) return
     setBusy(true)
-    deleteAllData({ data: dataStore, clearTexts: clearTextCache })
+    deleteAllData({
+      everything: () => profileManager.deleteEverything(),
+      clearTexts: clearTextCache,
+    })
       .then(() => navigate('/welcome', { replace: true }))
       .catch((error: unknown) => {
         console.error(error)
@@ -88,6 +105,8 @@ export function DataSection() {
         setBusy(false)
       })
   }
+
+  const when = pending ? new Date(pending.exportedAt).toLocaleDateString() : ''
 
   return (
     <section aria-labelledby="data-title" className="mt-10">
@@ -100,9 +119,22 @@ export function DataSection() {
       </p>
 
       <div className="mt-4 flex flex-wrap gap-3">
-        <button type="button" className={button} onClick={onExport}>
-          Export my data
+        <button
+          type="button"
+          className={button}
+          onClick={() => save(makeBackup(profileManager, { named: many }))}
+        >
+          {many ? 'Export this profile' : 'Export my data'}
         </button>
+        {many && (
+          <button
+            type="button"
+            className={button}
+            onClick={() => save(makeAllProfilesBackup(profileManager))}
+          >
+            Export all profiles
+          </button>
+        )}
         <button
           type="button"
           className={button}
@@ -131,31 +163,119 @@ export function DataSection() {
         </p>
       )}
 
-      {pending && (
+      {pending?.kind === 'profile' && !confirmReplace && (
         <div
           role="alertdialog"
-          aria-label="Restore this backup"
+          aria-label="Import this backup"
           className="mt-4 rounded-card border border-line bg-surface p-4"
         >
           <p>
-            Replace everything on this device with this backup (made{' '}
-            {new Date(pending.exportedAt).toLocaleDateString()})? What is here
-            now will be overwritten.
+            This backup
+            {pending.name ? ` is for “${pending.name}” and` : ''} was made{' '}
+            {when}. What would you like to do with it?
+          </p>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <button
+              type="button"
+              autoFocus
+              className={danger}
+              disabled={
+                busy || snapshot.profiles.length >= MAX_READING_PROFILES
+              }
+              onClick={() =>
+                finish(addBackupAsProfile(profileManager, pending), () =>
+                  say('Added the backup as a new profile.'),
+                )
+              }
+            >
+              Add as a new profile
+            </button>
+            <button
+              type="button"
+              className={button}
+              disabled={busy}
+              onClick={() => setConfirmReplace(true)}
+            >
+              Replace this profile
+            </button>
+            <button type="button" className={button} onClick={cancelImport}>
+              Cancel
+            </button>
+          </div>
+          {snapshot.profiles.length >= MAX_READING_PROFILES && (
+            <p className="mt-2 text-sm text-muted">
+              You already have {MAX_READING_PROFILES} profiles, the most this
+              device keeps. Delete one to add another.
+            </p>
+          )}
+        </div>
+      )}
+
+      {pending?.kind === 'profile' && confirmReplace && (
+        <div
+          role="alertdialog"
+          aria-label="Replace this profile"
+          className="mt-4 rounded-card border border-line bg-surface p-4"
+        >
+          <p>
+            Replace everything {openName} has read, Dog-eared and taught Twice
+            Told with this backup? What {openName} has now will be overwritten.
+            Other profiles are not touched.
           </p>
           <div className="mt-3 flex gap-3">
             <button
               type="button"
               className={danger}
               disabled={busy}
-              onClick={onRestore}
+              onClick={() =>
+                finish(
+                  replaceProfileFromBackup(profileManager, pending),
+                  () => {
+                    say('Backup restored.')
+                    void navigate('/')
+                  },
+                )
+              }
             >
-              Yes, replace my data
+              Yes, replace this profile
             </button>
+            <button type="button" className={button} onClick={cancelImport}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {pending?.kind === 'all' && (
+        <div
+          role="alertdialog"
+          aria-label="Restore this backup"
+          className="mt-4 rounded-card border border-line bg-surface p-4"
+        >
+          <p>
+            Replace everything on this device with this backup of{' '}
+            {pending.profiles.length} profile
+            {pending.profiles.length === 1 ? '' : 's'} (made {when})? Every
+            profile here now will be overwritten.
+          </p>
+          <div className="mt-3 flex gap-3">
             <button
               type="button"
-              className={button}
-              onClick={() => setPending(null)}
+              className={danger}
+              disabled={busy}
+              onClick={() =>
+                finish(
+                  replaceEverythingFromBackup(profileManager, pending),
+                  () => {
+                    say('Backup restored.')
+                    void navigate('/')
+                  },
+                )
+              }
             >
+              Yes, replace everything
+            </button>
+            <button type="button" className={button} onClick={cancelImport}>
               Cancel
             </button>
           </div>
@@ -178,8 +298,9 @@ export function DataSection() {
             className="rounded-card border border-line bg-surface p-4"
           >
             <p>
-              This wipes your taste, library, progress, settings and every saved
-              book from this device. It cannot be undone.
+              This wipes {many ? 'every profile — ' : ''}your taste, library,
+              progress, settings and every saved book from this device. It
+              cannot be undone.
             </p>
             <label className="mt-3 block">
               <span className="block">Type {DELETE_WORD} to confirm</span>

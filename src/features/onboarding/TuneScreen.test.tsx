@@ -11,7 +11,8 @@ const h = vi.hoisted(() => ({
     typeof import('../shortlist/fakeStores').fakeStores
   >,
 }))
-vi.mock('../../stores', () => {
+vi.mock('../../stores', async () => {
+  const { delegateManager } = await import('../shortlist/fakeStores')
   const delegate = (name: string) =>
     new Proxy(
       {},
@@ -28,6 +29,7 @@ vi.mock('../../stores', () => {
       },
     )
   return {
+    profileManager: delegateManager(() => h.current),
     eventLog: delegate('eventLog'),
     profileStore: delegate('profileStore'),
     settingsStore: delegate('settingsStore'),

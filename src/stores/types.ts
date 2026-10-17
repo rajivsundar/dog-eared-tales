@@ -161,3 +161,32 @@ export interface SettingsStore {
   get(): Promise<Settings>
   update(changes: Partial<Omit<Settings, 'id'>>): Promise<Settings>
 }
+
+/** The six colours a reading profile can have. Each has a name, so colour is never the only cue. */
+export const PROFILE_COLORS = [
+  { id: 'rust', name: 'Rust' },
+  { id: 'forest', name: 'Forest' },
+  { id: 'ocean', name: 'Ocean' },
+  { id: 'plum', name: 'Plum' },
+  { id: 'gold', name: 'Gold' },
+  { id: 'slate', name: 'Slate' },
+] as const
+
+export type ProfileColor = (typeof PROFILE_COLORS)[number]['id']
+
+/** Most reading profiles one device keeps (the guest is extra). */
+export const MAX_READING_PROFILES = 6
+/** Longest name a reading profile can have. */
+export const MAX_PROFILE_NAME = 20
+
+/**
+ * One person's reading on this device (UI label: "Profile"). Not an account. Called a "reading
+ * profile" in code so it is never confused with the taste `Profile` above.
+ */
+export interface ReadingProfile {
+  id: string
+  name: string
+  color: ProfileColor
+  createdAt: number
+  lastUsedAt: number
+}

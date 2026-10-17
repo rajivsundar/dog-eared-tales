@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test'
-import { startApp, turnForward, waitForReader } from './helpers'
+import { startApp, turnForward, waitForReader, mapProfileDb } from './helpers'
+
+test.beforeEach(async ({ page }) => {
+  await mapProfileDb(page)
+})
 
 test('a dog-eared story moves to Reading after two pages, with minutes left', async ({
   page,
@@ -45,7 +49,7 @@ test('a dog-eared story moves to Reading after two pages, with minutes left', as
       page.evaluate(
         () =>
           new Promise<number>((resolve) => {
-            const open = indexedDB.open('twice-told')
+            const open = indexedDB.open('profile-db')
             open.onsuccess = () => {
               const all = open.result
                 .transaction('progress')
@@ -189,7 +193,7 @@ test('the end-of-story check-in records a rating, and the Library can rate later
   const events = await page.evaluate(
     () =>
       new Promise<{ type: string; reason?: string }[]>((resolve) => {
-        const open = indexedDB.open('twice-told')
+        const open = indexedDB.open('profile-db')
         open.onsuccess = () => {
           const all = open.result
             .transaction('events')

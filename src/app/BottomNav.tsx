@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
 import { NavLink, Outlet } from 'react-router'
+import { ProfileDot } from '../features/profiles/ProfileDot'
+import { useProfiles } from '../features/profiles/useProfiles'
 
 const icon = {
   width: 24,
@@ -48,6 +50,14 @@ const TABS: { to: string; label: string; end?: boolean; icon: ReactNode }[] = [
 
 /** The page with the bottom navigation: Shortlist, Library and Settings. The reader does not use it. */
 export function WithBottomNav() {
+  const profiles = useProfiles()
+  const guest = profiles.mode === 'guest'
+  // The dot shows who is reading, but only when there is a choice of readers.
+  const who = guest
+    ? { name: 'a guest', color: 'slate' as const }
+    : profiles.profiles.length >= 2 && profiles.active
+      ? profiles.active
+      : null
   return (
     <>
       <div className="pb-[calc(var(--nav-height)+1rem)]">
@@ -70,7 +80,18 @@ export function WithBottomNav() {
               }`
             }
           >
-            {tab.icon}
+            <span className="relative">
+              {tab.icon}
+              {tab.to === '/settings' && who && (
+                <span
+                  role="img"
+                  aria-label={`Reading as ${who.name}`}
+                  className="absolute -top-0.5 -right-1.5"
+                >
+                  <ProfileDot color={who.color} size="sm" dashed={guest} />
+                </span>
+              )}
+            </span>
             {tab.label}
           </NavLink>
         ))}

@@ -1,3 +1,3 @@
 # features/settings
 
-Settings: theme, reading preferences, taste reset, data export and import. For now /settings is a placeholder page.
+Settings: your taste (with Reset), Profiles, Install, Storage, Your data (export, import, delete) and About.

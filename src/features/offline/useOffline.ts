@@ -8,6 +8,7 @@ import {
 import {
   eventLog,
   libraryStore,
+  profileManager,
   progressStore,
   settingsStore,
 } from '../../stores'
@@ -34,9 +35,11 @@ export function useCachedTexts(): ReadonlySet<string> {
   return paths
 }
 
-/** Works out what to keep and quietly stores it. Does nothing offline. */
+/** Works out what to keep and quietly stores it. Does nothing offline, or for the guest. */
 export async function syncOfflineTexts(now: Date = new Date()): Promise<void> {
   if (typeof navigator !== 'undefined' && !navigator.onLine) return
+  // A guest keeps nothing, so nothing is stored for them.
+  if (profileManager.current().mode === 'guest') return
   try {
     const [catalog, settings, library, progress, events] = await Promise.all([
       loadCatalog(),

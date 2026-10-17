@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { Settings } from '../../stores'
 import { fakeStores } from '../shortlist/fakeStores'
 import {
   formatBytes,
@@ -12,14 +11,14 @@ function setup(persist: () => Promise<boolean> = async () => true) {
   const s = fakeStores()
   const storage = { persist: vi.fn(persist) }
   const deps = {
-    settings: s.settingsStore,
+    persistence: s.profileManager,
     events: s.eventLog,
     storage,
   }
   return { s, storage, deps }
 }
-const persistence = async (s: ReturnType<typeof fakeStores>) =>
-  ((await s.settingsStore.get()) as Settings).persistence
+const persistence = (s: ReturnType<typeof fakeStores>) =>
+  s.profileManager.getPersistence()
 
 describe('asking the browser to protect the data', () => {
   it('does not ask before the first Dog-ear or finished work', async () => {
@@ -84,8 +83,9 @@ describe('asking the browser to protect the data', () => {
     )
     await s.eventLog.append({ workId: 'w1', type: 'save' })
     const asking = requestPersistenceIfEarned(deps)
-    await new Promise((r) => setTimeout(r, 5))
-    expect((await persistence(s))?.requested).toBe(true)
+    await vi.waitFor(async () =>
+      expect((await persistence(s))?.requested).toBe(true),
+    )
     answer(true)
     await asking
     expect(storage.persist).toHaveBeenCalledTimes(1)
@@ -95,10 +95,18 @@ describe('asking the browser to protect the data', () => {
     const s = fakeStores()
     await s.eventLog.append({ workId: 'w1', type: 'save' })
     await requestPersistenceIfEarned({
-      settings: s.settingsStore,
+      persistence: s.profileManager,
       events: s.eventLog,
       storage: {} as never,
     })
+    expect(await persistence(s)).toBeUndefined()
+  })
+
+  it('never asks for a guest, whatever they do', async () => {
+    const { s, storage, deps } = setup()
+    await s.eventLog.append({ workId: 'w1', type: 'save' })
+    await requestPersistenceIfEarned({ ...deps, isGuest: () => true })
+    expect(storage.persist).not.toHaveBeenCalled()
     expect(await persistence(s)).toBeUndefined()
   })
 

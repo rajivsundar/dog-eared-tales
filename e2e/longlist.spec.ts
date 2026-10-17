@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { startApp } from './helpers'
+import { startApp, mapProfileDb } from './helpers'
 
 /** Writes events straight into the app's IndexedDB, as if the reader had done these things. */
 function addEvents(
@@ -10,7 +10,7 @@ function addEvents(
   return page.evaluate(
     (list) =>
       new Promise<void>((resolve, reject) => {
-        const open = indexedDB.open('twice-told')
+        const open = indexedDB.open('profile-db')
         open.onerror = () => reject(open.error)
         open.onsuccess = () => {
           const db = open.result
@@ -28,6 +28,10 @@ function addEvents(
     events,
   )
 }
+
+test.beforeEach(async ({ page }) => {
+  await mapProfileDb(page)
+})
 
 test('Your Long List appears after 3 positive finishes, with sittings', async ({
   page,

@@ -2,8 +2,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   BACKUP_SCHEMA_VERSION,
   BackupError,
-  createDataStore,
+  type ProfileBackup,
+  clearStores,
+  firstDifference,
   parseBackup,
+  readStores,
+  replaceStores,
 } from './backup'
 import type { TwiceToldDB } from './db'
 import { createEventLog } from './eventLog'
@@ -13,6 +17,21 @@ import { createProfileStore } from './profileStore'
 import { createProgressStore } from './progressStore'
 import { createSettingsStore } from './settingsStore'
 import { newTestDb } from './testDb'
+
+/** The same three jobs as the open profile's dataStore, over one database. */
+const createDataStore = (target: TwiceToldDB) => ({
+  exportAll: async (): Promise<ProfileBackup> => ({
+    app: 'twice-told',
+    schemaVersion: BACKUP_SCHEMA_VERSION,
+    kind: 'profile',
+    exportedAt: new Date().toISOString(),
+    name: 'Me',
+    color: 'rust',
+    stores: await readStores(target),
+  }),
+  importAll: (backup: ProfileBackup) => replaceStores(target, backup.stores),
+  deleteAll: () => clearStores(target),
+})
 
 let db: TwiceToldDB
 
@@ -109,7 +128,7 @@ describe('export, delete everything, import', () => {
     for (const records of Object.values(empty.stores))
       expect(records).toEqual([])
 
-    await data.importAll(parseBackup(file))
+    await data.importAll(parseBackup(file) as ProfileBackup)
     const after = await data.exportAll()
     expect(withoutDate(after)).toEqual(withoutDate(before))
     // The stores work as normal afterwards.
@@ -165,15 +184,6 @@ describe('refusing bad files', () => {
     }
   })
 
-  it('refuses a newer backup even when it is handed straight to importAll, and changes nothing', async () => {
-    await fill(db)
-    const data = createDataStore(db)
-    const before = await data.exportAll()
-    const newer = { ...before, schemaVersion: BACKUP_SCHEMA_VERSION + 5 }
-    await expect(data.importAll(newer)).rejects.toThrow(BackupError)
-    expect(withoutDate(await data.exportAll())).toEqual(withoutDate(before))
-  })
-
   it('accepts the current version and older ones', async () => {
     const file = JSON.parse(await valid())
     file.schemaVersion = BACKUP_SCHEMA_VERSION
@@ -217,5 +227,89 @@ describe('deleting everything', () => {
     expect(await createHighlightStore(db).listForWork('w1')).toEqual([])
     // Settings are back to the defaults.
     expect((await createSettingsStore(db).get()).theme).toBe('system')
+  })
+})
+
+describe('the version 2 file formats', () => {
+  const emptyStores = {
+    profile: [],
+    events: [],
+    library: [],
+    progress: [],
+    highlights: [],
+    settings: [],
+  }
+
+  it('writes a one-profile file with its name and colour', async () => {
+    await fill(db)
+    const backup = await createDataStore(db).exportAll()
+    expect(backup.schemaVersion).toBe(2)
+    expect(backup.kind).toBe('profile')
+    expect(backup.name).toBe('Me')
+    expect(backup.color).toBe('rust')
+  })
+
+  it('still reads a version 1 file, as one profile with no name', () => {
+    const v1 = {
+      app: 'twice-told',
+      schemaVersion: 1,
+      exportedAt: '2026-01-01T00:00:00.000Z',
+      stores: emptyStores,
+    }
+    const parsed = parseBackup(JSON.stringify(v1))
+    expect(parsed.kind).toBe('profile')
+    expect((parsed as ProfileBackup).name).toBeUndefined()
+    expect(parsed.schemaVersion).toBe(1)
+  })
+
+  it('reads an all-profiles file, with the profile that was open', () => {
+    const all = {
+      app: 'twice-told',
+      schemaVersion: 2,
+      kind: 'all',
+      exportedAt: '2026-01-01T00:00:00.000Z',
+      activeIndex: 1,
+      profiles: [
+        { name: 'Me', color: 'rust', stores: emptyStores },
+        { name: 'Sam', color: 'ocean', stores: emptyStores },
+      ],
+    }
+    const parsed = parseBackup(JSON.stringify(all))
+    expect(parsed.kind).toBe('all')
+    if (parsed.kind === 'all') {
+      expect(parsed.profiles.map((p) => p.name)).toEqual(['Me', 'Sam'])
+      expect(parsed.activeIndex).toBe(1)
+    }
+  })
+
+  it('refuses an all-profiles file with more than 6 profiles, or with a bad colour', () => {
+    const profile = { name: 'A', color: 'rust', stores: emptyStores }
+    const make = (profiles: unknown[]) =>
+      JSON.stringify({
+        app: 'twice-told',
+        schemaVersion: 2,
+        kind: 'all',
+        exportedAt: 'x',
+        activeIndex: 0,
+        profiles,
+      })
+    expect(() => parseBackup(make(Array(7).fill(profile)))).toThrow(
+      /more than 6/,
+    )
+    expect(() =>
+      parseBackup(make([{ ...profile, color: 'chartreuse' }])),
+    ).toThrow(BackupError)
+    expect(() => parseBackup(make([]))).toThrow(BackupError)
+  })
+
+  it('compares two copies record by record', async () => {
+    await fill(db)
+    const a = await readStores(db)
+    const b = JSON.parse(JSON.stringify(a))
+    expect(firstDifference(a, b)).toBeNull()
+    b.events[1].reason = 'changed'
+    expect(firstDifference(a, b)).toMatch(/events: record .* differs/)
+    b.events.pop()
+    expect(firstDifference(a, b)).toMatch(/events: 3 records became 2/)
   })
 })

@@ -1,4 +1,11 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import {
+  waitFor,
+  act,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetCatalogCache } from '../../catalog'
@@ -6,6 +13,11 @@ import { fakeCacheStorage } from '../../pwa/fakeCaches'
 import { setDeferredPromptForTest } from '../../pwa/install'
 import { TEXTS_CACHE } from '../../pwa/textCache'
 import { BACKUP_SCHEMA_VERSION } from '../../stores/backup'
+import { createEventLog } from '../../stores/eventLog'
+import { createLibraryStore } from '../../stores/libraryStore'
+import { createProfileStore } from '../../stores/profileStore'
+import { createProgressStore } from '../../stores/progressStore'
+import { createSettingsStore } from '../../stores/settingsStore'
 import { fakeCatalog, fakeStores } from '../shortlist/fakeStores'
 import { SettingsScreen } from './SettingsScreen'
 
@@ -16,6 +28,7 @@ const h = vi.hoisted(() => ({
 }))
 vi.mock('../../stores', async () => {
   const backup = await import('../../stores/backup')
+  const { delegateManager } = await import('../shortlist/fakeStores')
   const delegate = (name: string) =>
     new Proxy(
       {},
@@ -32,6 +45,11 @@ vi.mock('../../stores', async () => {
       },
     )
   return {
+    profileManager: delegateManager(() => h.current),
+    ProfileError: (await import('../../stores/profileManager')).ProfileError,
+    MAX_READING_PROFILES: 6,
+    PROFILE_COLORS: (await import('../../stores/types')).PROFILE_COLORS,
+    MAX_PROFILE_NAME: 20,
     eventLog: delegate('eventLog'),
     profileStore: delegate('profileStore'),
     settingsStore: delegate('settingsStore'),
@@ -228,21 +246,36 @@ describe('Settings → Install', () => {
   })
 })
 
+/** The reading data of the open profile, read and written through the real profile manager. */
+function live() {
+  const pm = stores.profileManager
+  return {
+    events: pm.forward(createEventLog),
+    library: pm.forward(createLibraryStore),
+    progress: pm.forward(createProgressStore),
+    settings: pm.forward(createSettingsStore),
+    profile: pm.forward(createProfileStore),
+  }
+}
+
 describe('Settings → Your data: export', () => {
-  it('downloads one JSON file named with the date, holding every store and a schema version', async () => {
-    await stores.eventLog.append({ workId: 'story-1', type: 'finished', at: 5 })
-    await stores.libraryStore.save('story-2')
+  it('with one profile: "Export my data" downloads one JSON file named with the date', async () => {
+    const data = live()
+    await data.events.append({ workId: 'story-1', type: 'finished', at: 5 })
+    await data.library.save('story-2')
     const downloads = captureDownloads()
     renderSettings()
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Export my data' }))
     })
-    expect(downloads).toHaveLength(1)
+    await waitFor(() => expect(downloads).toHaveLength(1))
     expect(downloads[0].name).toMatch(
       /^twice-told-backup-\d{4}-\d{2}-\d{2}\.json$/,
     )
     const file = JSON.parse(await downloads[0].blob.text())
     expect(file.schemaVersion).toBe(BACKUP_SCHEMA_VERSION)
+    expect(file.kind).toBe('profile')
+    expect(file.name).toBe('Me')
     expect(file.app).toBe('twice-told')
     expect(Object.keys(file.stores).sort()).toEqual([
       'events',
@@ -254,9 +287,38 @@ describe('Settings → Your data: export', () => {
     ])
     expect(file.stores.events).toHaveLength(1)
     expect(file.stores.library[0].workId).toBe('story-2')
-    expect(screen.getByRole('status')).toHaveTextContent(
+    expect(await screen.findByRole('status')).toHaveTextContent(
       /Saved twice-told-backup-/,
     )
+  })
+
+  it('with 2+ profiles: "Export this profile" and "Export all profiles"', async () => {
+    await stores.profileManager.create({ name: 'Sam' })
+    const downloads = captureDownloads()
+    renderSettings()
+    expect(
+      screen.queryByRole('button', { name: 'Export my data' }),
+    ).not.toBeInTheDocument()
+    await act(async () => {
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Export this profile' }),
+      )
+    })
+    await waitFor(() => expect(downloads).toHaveLength(1))
+    expect(downloads[0].name).toMatch(/^twice-told-backup-me-\d{4}/)
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Export all profiles' }),
+      )
+    })
+    await waitFor(() => expect(downloads).toHaveLength(2))
+    expect(downloads[1].name).toMatch(/^twice-told-all-profiles-\d{4}/)
+    const all = JSON.parse(await downloads[1].blob.text())
+    expect(all.kind).toBe('all')
+    expect(all.profiles.map((p: { name: string }) => p.name)).toEqual([
+      'Me',
+      'Sam',
+    ])
   })
 })
 
@@ -269,44 +331,114 @@ describe('Settings → Your data: import', () => {
     })
   }
 
-  it('asks before restoring, then replaces everything with the backup', async () => {
-    await stores.eventLog.append({ workId: 'story-1', type: 'finished', at: 5 })
-    await stores.libraryStore.save('story-2')
-    const backup = await stores.dataStore.exportAll()
-    // Change things after the backup was made.
-    await stores.eventLog.append({ workId: 'story-9', type: 'open', at: 9 })
-    await stores.libraryStore.save('story-8')
+  it('offers "Add as a new profile" first, and that is the default', async () => {
+    const data = live()
+    await data.library.save('story-2')
+    const backup = await stores.profileManager.exportProfile()
+    await data.library.save('story-8') // changed after the backup
 
     renderSettings()
     await chooseFile(backupFile(backup))
-    const dialog = screen.getByRole('alertdialog', {
-      name: 'Restore this backup',
+    const dialog = await screen.findByRole('alertdialog', {
+      name: 'Import this backup',
     })
-    // Nothing changes until it is confirmed.
-    expect(stores.events).toHaveLength(2)
+    const buttons = within(dialog).getAllByRole('button')
+    expect(buttons[0]).toHaveTextContent('Add as a new profile')
+    expect(buttons[0]).toHaveFocus()
+    expect(
+      within(dialog).getByRole('button', { name: 'Replace this profile' }),
+    ).toBeInTheDocument()
+
+    await act(async () => {
+      fireEvent.click(buttons[0])
+    })
+    // The open profile is untouched; a second profile now exists.
+    await waitFor(() =>
+      expect(stores.profileManager.current().profiles).toHaveLength(2),
+    )
+    expect(stores.profileManager.current().active?.name).toBe('Me')
+    expect((await data.library.list()).map((w) => w.workId).sort()).toEqual([
+      'story-2',
+      'story-8',
+    ])
+    expect(stores.profileManager.current().profiles[1].name).toBe('Me (2)')
+  })
+
+  it('"Replace this profile" asks a second time, then replaces only the open profile', async () => {
+    const data = live()
+    await data.events.append({ workId: 'story-1', type: 'finished', at: 5 })
+    await data.library.save('story-2')
+    const backup = await stores.profileManager.exportProfile()
+    await data.events.append({ workId: 'story-9', type: 'open', at: 9 })
+    await data.library.save('story-8')
+
+    renderSettings()
+    await chooseFile(backupFile(backup))
+    const first = await screen.findByRole('alertdialog', {
+      name: 'Import this backup',
+    })
+    fireEvent.click(
+      within(first).getByRole('button', { name: 'Replace this profile' }),
+    )
+    // The second confirmation. Nothing has changed yet.
+    const second = screen.getByRole('alertdialog', {
+      name: 'Replace this profile',
+    })
+    expect((await data.events.list()).map((e) => e.workId)).toEqual([
+      'story-1',
+      'story-9',
+    ])
     await act(async () => {
       fireEvent.click(
-        within(dialog).getByRole('button', { name: 'Yes, replace my data' }),
+        within(second).getByRole('button', {
+          name: 'Yes, replace this profile',
+        }),
       )
     })
-    expect(stores.events.map((e) => e.workId)).toEqual(['story-1'])
-    expect([...stores.library.keys()]).toEqual(['story-2'])
     expect(await screen.findByText('HOME')).toBeInTheDocument()
+    expect((await data.events.list()).map((e) => e.workId)).toEqual(['story-1'])
+    expect((await data.library.list()).map((w) => w.workId)).toEqual([
+      'story-2',
+    ])
+    expect(stores.profileManager.current().profiles).toHaveLength(1)
+  })
+
+  it('an all-profiles file asks once to replace everything', async () => {
+    await stores.profileManager.create({ name: 'Sam' })
+    const all = await stores.profileManager.exportAllProfiles()
+    await stores.profileManager.create({ name: 'Extra' })
+
+    renderSettings()
+    await chooseFile(backupFile(all))
+    const dialog = await screen.findByRole('alertdialog', {
+      name: 'Restore this backup',
+    })
+    expect(dialog).toHaveTextContent('2 profiles')
+    await act(async () => {
+      fireEvent.click(
+        within(dialog).getByRole('button', { name: 'Yes, replace everything' }),
+      )
+    })
+    expect(await screen.findByText('HOME')).toBeInTheDocument()
+    expect(stores.profileManager.current().profiles.map((p) => p.name)).toEqual(
+      ['Me', 'Sam'],
+    )
   })
 
   it('Cancel leaves everything as it was', async () => {
-    const backup = await stores.dataStore.exportAll()
-    await stores.eventLog.append({ workId: 'story-9', type: 'open', at: 9 })
+    const data = live()
+    const backup = await stores.profileManager.exportProfile()
+    await data.events.append({ workId: 'story-9', type: 'open', at: 9 })
     renderSettings()
     await chooseFile(backupFile(backup))
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
-    expect(stores.events).toHaveLength(1)
+    expect(await data.events.list()).toHaveLength(1)
+    expect(stores.profileManager.current().profiles).toHaveLength(1)
   })
 
   it('refuses a backup from a newer schema version, and asks nothing', async () => {
-    await stores.eventLog.append({ workId: 'story-1', type: 'finished', at: 5 })
-    const backup = await stores.dataStore.exportAll()
+    const backup = await stores.profileManager.exportProfile()
     renderSettings()
     await chooseFile(
       backupFile({ ...backup, schemaVersion: BACKUP_SCHEMA_VERSION + 1 }),
@@ -315,7 +447,33 @@ describe('Settings → Your data: import', () => {
       /newer version of Twice Told/,
     )
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
-    expect(stores.events).toHaveLength(1)
+  })
+
+  it('still reads a version 1 file (from before profiles), adding it as "Imported"', async () => {
+    const data = live()
+    await data.library.save('story-2')
+    const { stores: contents } = await stores.profileManager.exportProfile()
+    const v1 = {
+      app: 'twice-told',
+      schemaVersion: 1,
+      exportedAt: '2026-01-01T00:00:00.000Z',
+      stores: contents,
+    }
+    renderSettings()
+    await chooseFile(backupFile(v1))
+    const dialog = await screen.findByRole('alertdialog', {
+      name: 'Import this backup',
+    })
+    await act(async () => {
+      fireEvent.click(
+        within(dialog).getByRole('button', { name: 'Add as a new profile' }),
+      )
+    })
+    await waitFor(() =>
+      expect(
+        stores.profileManager.current().profiles.map((p) => p.name),
+      ).toEqual(['Me', 'Imported']),
+    )
   })
 
   it('refuses a file that is not a backup', async () => {
@@ -332,23 +490,26 @@ describe('Settings → Your data: import', () => {
   })
 
   it('export → delete all → import gives identical data', async () => {
-    await stores.eventLog.append({ workId: 'story-1', type: 'finished', at: 5 })
-    await stores.eventLog.append({ workId: 'story-1', type: 'love', at: 6 })
-    await stores.libraryStore.save('story-2', { addedAt: 77 })
-    await stores.progressStore.set({
+    const data = live()
+    await data.events.append({ workId: 'story-1', type: 'finished', at: 5 })
+    await data.events.append({ workId: 'story-1', type: 'love', at: 6 })
+    await data.library.save('story-2', { addedAt: 77 })
+    await data.progress.set({
       workId: 'story-3',
       locator: 'cfi',
       percent: 20,
       secondsRead: 90,
     })
-    await stores.settingsStore.update({ theme: 'night' })
+    await data.settings.update({ theme: 'night' })
     const downloads = captureDownloads()
-    const before = await stores.dataStore.exportAll()
+    const before = (await stores.profileManager.exportProfile()).stores
+    const progressBefore = before.progress.map((p) => p.workId)
 
     renderSettings()
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Export my data' }))
     })
+    await waitFor(() => expect(downloads).toHaveLength(1))
     const file = new File([await downloads[0].blob.text()], downloads[0].name)
 
     // Delete all my data.
@@ -359,21 +520,25 @@ describe('Settings → Your data: import', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Delete everything' }))
     })
-    expect(stores.events).toHaveLength(0)
-    expect(stores.library.size).toBe(0)
     expect(await screen.findByText('WELCOME')).toBeInTheDocument()
+    expect(await live().events.list()).toHaveLength(0)
 
-    // Import the file back.
+    // Import the file back, replacing the (new, empty) profile.
     cleanup()
     renderSettings()
     await chooseFile(file)
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Replace this profile' }),
+    )
     await act(async () => {
       fireEvent.click(
-        screen.getByRole('button', { name: 'Yes, replace my data' }),
+        screen.getByRole('button', { name: 'Yes, replace this profile' }),
       )
     })
-    const after = await stores.dataStore.exportAll()
-    expect({ ...after, exportedAt: '' }).toEqual({ ...before, exportedAt: '' })
+    await screen.findByText('HOME')
+    const after = (await stores.profileManager.exportProfile()).stores
+    expect(after).toEqual(before)
+    expect(after.progress.map((p) => p.workId)).toEqual(progressBefore)
   })
 })
 
@@ -383,9 +548,10 @@ function cleanup() {
 
 describe('Settings → Your data: delete all my data', () => {
   async function seed() {
-    await stores.eventLog.append({ workId: 'story-1', type: 'finished', at: 5 })
-    await stores.libraryStore.save('story-2')
-    await stores.profileStore.put({
+    const data = live()
+    await data.events.append({ workId: 'story-1', type: 'finished', at: 5 })
+    await data.library.save('story-2')
+    await data.profile.put({
       id: 'profile',
       tasteVector: [],
       facetBeliefs: { 'mood:eerie': { success: 3, failure: 0 } },
@@ -393,11 +559,12 @@ describe('Settings → Your data: delete all my data', () => {
       wordsPerMinute: 238,
       version: 2,
     })
-    await stores.settingsStore.update({ theme: 'night' })
+    await data.settings.update({ theme: 'night' })
+    return data
   }
 
   it('needs DELETE typed exactly before it does anything', async () => {
-    await seed()
+    const data = await seed()
     renderSettings()
     fireEvent.click(screen.getByRole('button', { name: 'Delete all my data' }))
     const confirm = screen.getByRole('button', { name: 'Delete everything' })
@@ -407,13 +574,14 @@ describe('Settings → Your data: delete all my data', () => {
       fireEvent.change(input, { target: { value: wrong } })
       expect(confirm, JSON.stringify(wrong)).toBeDisabled()
     }
-    expect(stores.events).toHaveLength(1)
+    expect(await data.events.list()).toHaveLength(1)
     fireEvent.change(input, { target: { value: 'DELETE' } })
     expect(confirm).toBeEnabled()
   })
 
-  it('wipes every store and the saved books, then starts onboarding', async () => {
-    await seed()
+  it('wipes every profile and the saved books, then starts a fresh "Me" with the welcome', async () => {
+    const data = await seed()
+    await stores.profileManager.create({ name: 'Sam' })
     const fake = fakeCacheStorage({
       [TEXTS_CACHE]: ['/texts/pg-1.epub', '/texts/pg-2.epub'],
     })
@@ -433,20 +601,23 @@ describe('Settings → Your data: delete all my data', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Delete everything' }))
     })
-    expect(await stores.profileStore.get()).toBeUndefined()
-    expect(stores.events).toHaveLength(0)
-    expect(stores.library.size).toBe(0)
-    expect((await stores.settingsStore.get()).theme).toBe('system')
-    expect(deleted).toEqual([TEXTS_CACHE])
     expect(await screen.findByText('WELCOME')).toBeInTheDocument()
+    expect(await data.profile.get()).toBeUndefined()
+    expect(await data.events.list()).toHaveLength(0)
+    expect(await data.library.list()).toHaveLength(0)
+    expect((await data.settings.get()).theme).toBe('system')
+    expect(stores.profileManager.current().profiles.map((p) => p.name)).toEqual(
+      ['Me'],
+    )
+    expect(deleted).toEqual([TEXTS_CACHE])
   })
 
   it('Cancel changes nothing', async () => {
-    await seed()
+    const data = await seed()
     renderSettings()
     fireEvent.click(screen.getByRole('button', { name: 'Delete all my data' }))
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.queryByLabelText(/Type DELETE/)).not.toBeInTheDocument()
-    expect(stores.events).toHaveLength(1)
+    expect(await data.events.list()).toHaveLength(1)
   })
 })

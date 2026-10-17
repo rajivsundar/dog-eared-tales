@@ -1,6 +1,11 @@
 // In-memory stand-ins for the stores, for tests only.
 import { BACKUP_SCHEMA_VERSION } from '../../stores/backup'
-import type { BackupFile, DataStore } from '../../stores/backup'
+import type {
+  ProfileManager,
+  ProfileManagerOptions,
+} from '../../stores/profileManager'
+import { newTestManager } from '../../stores/testDb'
+import type { DataStore, ProfileBackup } from '../../stores/backup'
 import type {
   EventLog,
   LibraryStore,
@@ -14,7 +19,12 @@ import type {
   SettingsStore,
 } from '../../stores'
 
-export function fakeStores() {
+/**
+ * In-memory stand-ins for the stores. The reading-profile manager is the real one, over in-memory
+ * databases of its own, so profile screens can be tested for real; the data stores stay fake.
+ */
+export function fakeStores(manager: ProfileManagerOptions = {}) {
+  const profileManager = newTestManager(manager)
   let settings: Settings = {
     id: 'settings',
     theme: 'system',
@@ -93,7 +103,8 @@ export function fakeStores() {
   const defaults: Settings = { ...settings }
   /** Export, import and delete over these in-memory stores, like the real DataStore. */
   const dataStore: DataStore = {
-    exportAll: async (): Promise<BackupFile> => ({
+    exportAll: async (): Promise<ProfileBackup> => ({
+      kind: 'profile',
       app: 'twice-told',
       schemaVersion: BACKUP_SCHEMA_VERSION,
       exportedAt: new Date().toISOString(),
@@ -125,6 +136,7 @@ export function fakeStores() {
     },
   }
   return {
+    profileManager,
     dataStore,
     progressStore,
     settingsStore,
@@ -171,4 +183,29 @@ export function fakeCatalog() {
     generatedBy: 'claude-code',
     reviewed: true,
   }))
+}
+
+/**
+ * A stand-in for the profileManager export that forwards to whichever fake set is current. Its
+ * functions are the same objects on every access, as the real manager's are.
+ */
+export function delegateManager(
+  current: () => { profileManager: ProfileManager },
+): ProfileManager {
+  const cache = new Map<string, unknown>()
+  return new Proxy({} as ProfileManager, {
+    get(_, name: string) {
+      if (!cache.has(name)) {
+        cache.set(name, (...args: unknown[]) =>
+          (
+            current().profileManager as unknown as Record<
+              string,
+              (...a: unknown[]) => unknown
+            >
+          )[name](...args),
+        )
+      }
+      return cache.get(name)
+    },
+  })
 }

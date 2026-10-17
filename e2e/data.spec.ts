@@ -1,13 +1,13 @@
 import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { startApp } from './helpers'
+import { startApp, mapProfileDb } from './helpers'
 
 function readEvents(page: Page): Promise<{ id: string; type: string }[]> {
   return page.evaluate(
     () =>
       new Promise((resolve, reject) => {
-        const open = indexedDB.open('twice-told')
+        const open = indexedDB.open('profile-db')
         open.onerror = () => reject(open.error)
         open.onsuccess = () => {
           const db = open.result
@@ -28,6 +28,10 @@ async function gotoSettings(page: Page) {
     .click()
   await expect(page.getByRole('heading', { name: 'Your data' })).toBeVisible()
 }
+
+test.beforeEach(async ({ page }) => {
+  await mapProfileDb(page)
+})
 
 test('export, delete everything, then import brings the data back', async ({
   page,
@@ -61,7 +65,9 @@ test('export, delete everything, then import brings the data back', async ({
   const file = testInfo.outputPath('backup.json')
   await download.saveAs(file)
   const backup = JSON.parse(readFileSync(file, 'utf8'))
-  expect(backup.schemaVersion).toBe(1)
+  expect(backup.schemaVersion).toBe(2)
+  expect(backup.kind).toBe('profile')
+  expect(backup.name).toBe('Me')
   expect(Object.keys(backup.stores).sort()).toEqual([
     'events',
     'highlights',
@@ -90,10 +96,16 @@ test('export, delete everything, then import brings the data back', async ({
   await page.goto('/settings')
   await page.getByTestId('import-file').setInputFiles(file)
   await expect(
-    page.getByRole('alertdialog', { name: 'Restore this backup' }),
+    page.getByRole('alertdialog', { name: 'Import this backup' }),
   ).toBeVisible()
   expect(await readEvents(page)).toEqual([])
-  await page.getByRole('button', { name: 'Yes, replace my data' }).click()
+  await page.getByRole('button', { name: 'Replace this profile' }).click()
+  // Replacing asks a second time.
+  await expect(
+    page.getByRole('alertdialog', { name: 'Replace this profile' }),
+  ).toBeVisible()
+  expect(await readEvents(page)).toEqual([])
+  await page.getByRole('button', { name: 'Yes, replace this profile' }).click()
   await expect(page).toHaveURL(/\/$/)
   await expect(page.getByRole('listitem')).toHaveCount(6)
   const eventsAfter = await readEvents(page)

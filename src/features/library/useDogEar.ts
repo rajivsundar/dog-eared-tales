@@ -3,9 +3,12 @@ import {
   type SavedWork,
   eventLog,
   libraryStore,
-  settingsStore,
+  profileManager,
 } from '../../stores'
-import { requestPersistenceIfEarned } from '../storage/persistence'
+import {
+  persistenceDeps,
+  requestPersistenceIfEarned,
+} from '../storage/persistence'
 import { addDogEar, removeDogEar, restoreDogEar } from './dogEar'
 
 export interface DogEarRemoval {
@@ -70,10 +73,9 @@ export function useDogEar() {
       enqueue(async () => {
         await addDogEar(deps, workId)
         // The first Dog-ear asks the browser to protect the data (once).
-        await requestPersistenceIfEarned({
-          settings: settingsStore,
-          events: eventLog,
-        })
+        await requestPersistenceIfEarned(
+          persistenceDeps(profileManager, eventLog),
+        )
       })
     }
   }

@@ -1,6 +1,6 @@
 import { type Page, expect, test } from '@playwright/test'
 import { buildCatalog } from '../scripts/build-catalog.ts'
-import { shippedCount, turnForward } from './helpers'
+import { shippedCount, turnForward, mapProfileDb } from './helpers'
 
 // ---------------------------------------------------------------- helpers
 
@@ -44,7 +44,7 @@ function readStore(
   return page.evaluate(
     (name) =>
       new Promise<Record<string, unknown>[]>((resolve, reject) => {
-        const open = indexedDB.open('twice-told')
+        const open = indexedDB.open('profile-db')
         open.onerror = () => reject(open.error)
         open.onsuccess = () => {
           const db = open.result
@@ -66,6 +66,10 @@ function readStore(
 }
 
 // ---------------------------------------------------------------- tests
+
+test.beforeEach(async ({ page }) => {
+  await mapProfileDb(page)
+})
 
 test('the full list at /all has every shipped story and each one opens in the reader', async ({
   page,

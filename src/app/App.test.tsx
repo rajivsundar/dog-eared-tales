@@ -109,7 +109,7 @@ describe('App', () => {
 
   it('shows the bottom navigation with the current tab marked', async () => {
     renderAt('/settings')
-    const nav = screen.getByRole('navigation', { name: 'Main' })
+    const nav = await screen.findByRole('navigation', { name: 'Main' })
     expect(
       within(nav)
         .getAllByRole('link')

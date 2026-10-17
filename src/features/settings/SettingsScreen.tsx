@@ -6,6 +6,7 @@ import { InstallControl } from '../../pwa/InstallControl'
 import { useInstallMode } from '../../pwa/install'
 import { eventLog, profileStore } from '../../stores'
 import { DataSection } from '../data/DataSection'
+import { ProfilesSection } from '../profiles/ProfilesSection'
 import { StorageSection } from '../storage/StorageSection'
 import type { Profile } from '../../stores'
 
@@ -149,6 +150,8 @@ export function SettingsScreen() {
         )}
       </section>
 
+      <ProfilesSection />
+
       {installMode !== 'hidden' && (
         <section aria-labelledby="install-title" className="mt-10">
           <h2 id="install-title" className="font-serif text-2xl font-bold">
@@ -171,6 +174,9 @@ export function SettingsScreen() {
         <p className="mt-2">
           Named after Nathaniel Hawthorne’s Twice-Told Tales (1837) — stories
           worth telling again.
+        </p>
+        <p className="mt-2 text-muted">
+          Twice Told is for readers 16 and over.
         </p>
         <p className="mt-4 text-muted">
           Redo onboarding to pick your moods and taste cards again. Your reading

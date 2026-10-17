@@ -60,6 +60,11 @@ const h = vi.hoisted(() => {
       get: vi.fn(),
       update: vi.fn(async (c: unknown) => c),
     },
+    profileManager: {
+      getPersistence: vi.fn(async () => undefined),
+      setPersistence: vi.fn(async () => {}),
+      current: () => ({ mode: 'profile' }),
+    },
   }
 })
 
@@ -79,6 +84,7 @@ vi.mock('../../stores', () => ({
   eventLog: h.eventLog,
   settingsStore: h.settingsStore,
   libraryStore: h.libraryStore,
+  profileManager: h.profileManager,
 }))
 
 const entry = {
@@ -809,8 +815,9 @@ describe('the install offer and asking to protect the data', () => {
     })
     await finish()
     await waitFor(() => expect(persist).toHaveBeenCalledTimes(1))
-    expect(h.settingsStore.update).toHaveBeenCalledWith({
-      persistence: { requested: true, granted: true },
+    expect(h.profileManager.setPersistence).toHaveBeenCalledWith({
+      requested: true,
+      granted: true,
     })
   })
 

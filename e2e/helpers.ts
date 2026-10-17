@@ -34,6 +34,7 @@ export async function waitForReader(page: Page): Promise<void> {
  * (Pick my moods first, then Skip) and waits for Your Shortlist.
  */
 export async function startApp(page: Page): Promise<void> {
+  await mapProfileDb(page)
   await page.goto('/')
   const welcome = page.getByRole('button', { name: 'Pick my moods first' })
   const cards = page.getByRole('listitem')
@@ -43,4 +44,33 @@ export async function startApp(page: Page): Promise<void> {
     await page.getByRole('button', { name: 'Skip', exact: true }).click()
   }
   await expect(cards).toHaveCount(6)
+}
+
+/**
+ * Specs read and write the reader's data with indexedDB.open('profile-db'). Reading data now lives
+ * in a database per profile, so this makes that name mean "the only profile's database".
+ */
+export async function mapProfileDb(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const original = IDBFactory.prototype.open
+    IDBFactory.prototype.open = function (name: string, version?: number) {
+      if (name !== 'profile-db') return original.call(this, name, version)
+      const request: Record<string, unknown> = {}
+      void this.databases().then((list) => {
+        const real = list
+          .map((d) => d.name ?? '')
+          .find((n) => n.startsWith('twice-told-p-'))
+        const opening = original.call(this, real ?? 'twice-told-p-missing')
+        opening.onsuccess = () => {
+          request.result = opening.result
+          ;(request.onsuccess as (() => void) | undefined)?.()
+        }
+        opening.onerror = () => {
+          request.error = opening.error
+          ;(request.onerror as (() => void) | undefined)?.()
+        }
+      })
+      return request as unknown as IDBOpenDBRequest
+    }
+  })
 }

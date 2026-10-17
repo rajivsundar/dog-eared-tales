@@ -8,6 +8,7 @@ import {
 import type { Profile } from '../../stores'
 import {
   eventLog,
+  profileManager,
   profileStore,
   progressStore,
   settingsStore,
@@ -16,10 +17,14 @@ import { useDogEar } from '../library/useDogEar'
 import { UndoToast } from '../ui/UndoToast'
 import { DetailSheet } from '../detail/DetailSheet'
 import { minutesLabel } from '../detail/labels'
-import { requestPersistenceIfEarned } from '../storage/persistence'
+import {
+  persistenceDeps,
+  requestPersistenceIfEarned,
+} from '../storage/persistence'
 import { TuneCard } from '../onboarding/TuneCard'
 import { hasAnsweredCards } from '../onboarding/finishOnboarding'
 import { OfflineBadge } from '../offline/OfflineBadge'
+import { ReadingAs } from '../profiles/ReadingAs'
 import { useAutoCache, useCachedTexts } from '../offline/useOffline'
 import { LongListSection } from './LongListSection'
 import {
@@ -74,10 +79,9 @@ export function ShortlistScreen() {
           progress: progressStore,
         }
         const list = await loadShortlist(deps, now)
-        void requestPersistenceIfEarned({
-          settings: settingsStore,
-          events: eventLog,
-        })
+        void requestPersistenceIfEarned(
+          persistenceDeps(profileManager, eventLog),
+        )
         if (cancelled) return
         const long = await loadLongList(
           deps,
@@ -192,6 +196,7 @@ export function ShortlistScreen() {
         />
       )}
       <section aria-labelledby="shortlist-title" className="mt-8">
+        <ReadingAs />
         <h2
           id="shortlist-title"
           className="font-serif text-2xl font-bold sm:text-3xl"

@@ -1,9 +1,27 @@
-import type { EventLog, SettingsStore } from '../../stores'
+import type { EventLog, ProfileManager } from '../../stores'
 
 export interface PersistenceDeps {
-  settings: Pick<SettingsStore, 'get' | 'update'>
+  /** Where the answer is kept: one answer for the whole device, not one per profile. */
+  persistence: Pick<ProfileManager, 'getPersistence' | 'setPersistence'>
   events: Pick<EventLog, 'list'>
+  /** The guest never asks: nothing the guest does is kept. */
+  isGuest?: () => boolean
   storage?: Pick<StorageManager, 'persist'>
+}
+
+/** The usual dependencies, from the profile manager and the open profile's event log. */
+export function persistenceDeps(
+  manager: Pick<
+    ProfileManager,
+    'getPersistence' | 'setPersistence' | 'current'
+  >,
+  events: Pick<EventLog, 'list'>,
+): PersistenceDeps {
+  return {
+    persistence: manager,
+    events,
+    isGuest: () => manager.current().mode === 'guest',
+  }
 }
 
 /** The request that is running right now, so overlapping triggers share it. */
@@ -12,25 +30,23 @@ let running: Promise<void> | null = null
 /**
  * Asks the browser to protect Twice Told's data from automatic clearing (navigator.storage.persist()).
  * It does so once, and only after the reader's first Dog-ear or first finished work. The answer is
- * kept in the settings, so later calls (and later visits) never ask again.
+ * kept for the whole device, so later calls (and later visits) never ask again.
  */
 export function requestPersistenceIfEarned(
   deps: PersistenceDeps,
 ): Promise<void> {
   if (running) return running
   running = (async () => {
+    if (deps.isGuest?.()) return
     const storage = deps.storage ?? globalThis.navigator?.storage
     if (!storage?.persist) return
-    const settings = await deps.settings.get()
-    if (settings.persistence?.requested) return
+    if ((await deps.persistence.getPersistence())?.requested) return
     const events = await deps.events.list()
     if (!events.some((e) => e.type === 'save' || e.type === 'finished')) return
     // Write "asked" first, so a second tab or a quick second trigger cannot ask again.
-    await deps.settings.update({
-      persistence: { requested: true, granted: false },
-    })
+    await deps.persistence.setPersistence({ requested: true, granted: false })
     const granted = await storage.persist()
-    await deps.settings.update({ persistence: { requested: true, granted } })
+    await deps.persistence.setPersistence({ requested: true, granted })
   })()
     .catch((error: unknown) =>
       console.debug('could not ask for persistence', error),

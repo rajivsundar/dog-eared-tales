@@ -9,10 +9,18 @@ import {
   createReaderEngine,
   resolveTheme,
 } from '../../engine/reader'
-import { eventLog, progressStore, settingsStore } from '../../stores'
+import {
+  eventLog,
+  profileManager,
+  progressStore,
+  settingsStore,
+} from '../../stores'
 import { recordRating } from '../checkin/rating'
 import { useDogEar } from '../library/useDogEar'
-import { requestPersistenceIfEarned } from '../storage/persistence'
+import {
+  persistenceDeps,
+  requestPersistenceIfEarned,
+} from '../storage/persistence'
 import { useInstallOffer } from '../storage/useInstallOffer'
 import { useReadingSession } from './useReadingSession'
 import { UndoToast } from '../ui/UndoToast'
@@ -129,12 +137,13 @@ function Reader({ id }: { id: string }) {
           if (finished) return
           finished = true
           setPhase('finished')
-          void tracker?.finished().then(() =>
-            requestPersistenceIfEarned({
-              settings: settingsStore,
-              events: eventLog,
-            }),
-          )
+          void tracker
+            ?.finished()
+            .then(() =>
+              requestPersistenceIfEarned(
+                persistenceDeps(profileManager, eventLog),
+              ),
+            )
         })
         await engine.open(found.textUrl, {
           startHref: found.startHref,

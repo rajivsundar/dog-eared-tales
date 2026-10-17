@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { startApp } from './helpers'
+import { startApp, mapProfileDb } from './helpers'
 
 /** Reads every record in one of the app's IndexedDB stores. */
 function readStore(
@@ -10,7 +10,7 @@ function readStore(
   return page.evaluate(
     (name) =>
       new Promise<Record<string, unknown>[]>((resolve, reject) => {
-        const open = indexedDB.open('twice-told')
+        const open = indexedDB.open('profile-db')
         open.onerror = () => reject(open.error)
         open.onsuccess = () => {
           const db = open.result
@@ -42,6 +42,10 @@ async function onboardReasons(page: Page): Promise<unknown[]> {
 const MARCH = new Date(2026, 2, 3, 12)
 const FALL = new Date(2026, 9, 16, 12)
 const DEC_1 = new Date(2026, 11, 1, 12)
+
+test.beforeEach(async ({ page }) => {
+  await mapProfileDb(page)
+})
 
 test.describe('the welcome page', () => {
   test('shows the headline, subline, trust line and a fan of 3 real covers', async ({
@@ -234,7 +238,7 @@ test('the Tune card can be dismissed, and stays dismissed after a reload', async
   await page.evaluate(
     () =>
       new Promise<void>((resolve, reject) => {
-        const open = indexedDB.open('twice-told')
+        const open = indexedDB.open('profile-db')
         open.onerror = () => reject(open.error)
         open.onsuccess = () => {
           const db = open.result
