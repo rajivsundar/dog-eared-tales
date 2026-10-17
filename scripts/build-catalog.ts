@@ -76,6 +76,8 @@ export const CONTENT_NOTES = [
   'racism',
   'animal harm',
   'mental illness',
+  'sexual themes',
+  'threat to a child',
 ] as const
 export const ERA_BANDS = [
   'pre-1800',

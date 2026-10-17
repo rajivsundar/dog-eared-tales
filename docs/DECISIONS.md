@@ -12,6 +12,9 @@ Dated 2026-10-15.
 - **Intake choices:** whole books of 17,500 words or more are not added whole; only chosen chapters are (as essays titled as printed, shown "from <book>"). Short whole books (Communist Manifesto, Tao Teh King, Apology, As a Man Thinketh, The Magic Fishbone, The Prophet) are single entries.
 - **Genres:** the allowed list is horror, mystery, ghost story, satire, humour, romance, adventure, science fiction, literary, philosophy, social criticism, politics, history, memoir, spirituality, self-help, science, war and fantasy.
 - **Year:** a work's `year` in curation is the year of its first appearance in print (a magazine or newspaper counts), not of a later book or revised edition.
+- **Year fallback:** if a periodical date cannot be confirmed, `year` is the year of the first book collection that held the work (for example Bank Holiday and The Singing Lesson: 1922, The Garden Party).
+- **Content notes:** the approved list is death, grief, violence, suicide, illness, cruelty, racism, animal harm, mental illness, sexual themes and threat to a child.
+- **Hooks and blurbs:** they must not hint at a story's turn or ending: no "and then a letter" or "and then a telegram", no closing images, and no theme words that name the outcome.
 - **Curation rule:** for political, religious and philosophical texts, blurbs describe what the work argues and why it matters, without endorsing or criticising it.
 - **Covers:** simple generated SVG covers for now; AI cover art is deferred.
 - **Recommender:** tag-based scoring first; embeddings are deferred. Explain (Labs) is deferred.

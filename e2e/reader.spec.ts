@@ -1,5 +1,4 @@
 import { type Page, expect, test } from '@playwright/test'
-import { buildCatalog } from '../scripts/build-catalog.ts'
 import {
   expectPlaceHolds,
   mapProfileDb,
@@ -286,36 +285,7 @@ test('tapping the left and right of the page turns it, and the progress bar foll
 test('an EPUB 2 story (Miss Brill, pg-1429) starts at its title and stops at its end', async ({
   page,
 }) => {
-  // Miss Brill is not curated yet, so the app does not ship it. For this test the catalog and the
-  // book file are served to the page from the sources, exactly as a shipped story would be.
-  const miss = buildCatalog().base.find((b) => b.id === 'pg-1429-miss-brill')!
-  expect(miss).toBeTruthy()
-  await page.route('**/catalog/catalog.json', async (route) => {
-    const response = await route.fetch()
-    const file = (await response.json()) as { entries: unknown[] }
-    file.entries.push({
-      ...miss,
-      year: 1920,
-      eraBand: '1900-1930',
-      form: 'story',
-      genres: ['literary'],
-      moods: ['melancholy'],
-      contentNotes: [],
-      hook: 'h',
-      blurb: 'b',
-      generatedBy: 'test',
-      reviewed: true,
-    })
-    await route.fulfill({ response, json: file })
-  })
-  await page.route('**/texts/pg-1429.epub', (route) =>
-    route.fulfill({
-      path: 'content/raw/pg-1429-the-garden-party-and-other-stories.epub',
-      contentType: 'application/epub+zip',
-    }),
-  )
-
-  await openStory(page, miss.id)
+  await openStory(page, 'pg-1429-miss-brill')
   // It starts at its own title: not the book's title page, not the story before it.
   const first = await visibleText(page)
   expect(first.startsWith('Miss Brill')).toBe(true)
