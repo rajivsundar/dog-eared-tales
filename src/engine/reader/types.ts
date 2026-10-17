@@ -5,6 +5,10 @@ export interface OpenOptions {
   startHref?: string | null
   /** Where the next story starts, so this one ends. Leave out to open the whole book. */
   endHref?: string | null
+  /** Text where the story really starts in its first chapter file; everything before it is cut. */
+  startAtText?: string | null
+  /** Text where the story really ends in its last chapter file; it and everything after it is cut. */
+  endBeforeText?: string | null
   /** A place to resume from, as saved by an earlier onLocation callback. */
   locator?: string | null
   /** The reader's own speed. Defaults to 238 words per minute. */

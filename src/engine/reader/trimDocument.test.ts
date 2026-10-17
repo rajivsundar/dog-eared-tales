@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
-import { removeBefore, removeFrom } from './trimDocument'
+import {
+  findText,
+  removeBefore,
+  removeBeforeText,
+  removeFrom,
+  removeFromText,
+} from './trimDocument'
 
 function page(html: string): Document {
   return new DOMParser().parseFromString(
@@ -68,5 +74,29 @@ describe('cutting text from a page', () => {
     range.selectNode(doc.getElementById('s')!)
     removeBefore(range)
     expect(text(doc)).toBe('New.')
+  })
+})
+
+describe('cutting a page at some text', () => {
+  it('finds text that runs across paragraphs', () => {
+    const doc = page(
+      '<p>Before.</p><p>Printed by</p><p>Morrison &amp; Gibb</p>',
+    )
+    expect(findText(doc, 'Printed by Morrison & Gibb')).not.toBeNull()
+    expect(findText(doc, 'No such text')).toBeNull()
+  })
+
+  it('removes the text and everything after it, keeping what came before', () => {
+    const doc = page(
+      '<p>The story ends here. The following is a list of changes made.</p><p>Fixes.</p>',
+    )
+    removeFromText(findText(doc, 'The following is a list')!)
+    expect(text(doc)).toBe('The story ends here.')
+  })
+
+  it('removes everything before the text, keeping the text and what follows', () => {
+    const doc = page('<p>Notes.</p><p>Chapter one. It begins.</p><p>More.</p>')
+    removeBeforeText(findText(doc, 'It begins')!)
+    expect(text(doc)).toBe('It begins. More.')
   })
 })

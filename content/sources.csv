@@ -1,4 +1,4 @@
-file,story_title,source,source_url,story_href,story_end_href,story_author
+file,story_title,source,source_url,story_href,story_end_href,story_author,startAtText,endBeforeText
 pg-35-the-time-machine.epub,The Time Machine,Project Gutenberg,https://www.gutenberg.org/ebooks/35,,,
 pg-71-civil-disobedience.epub,On the Duty of Civil Disobedience,Project Gutenberg,https://www.gutenberg.org/ebooks/71,,,
 pg-269-beasts-and-super-beasts.epub,The Open Window,Project Gutenberg,https://www.gutenberg.org/ebooks/269,OEBPS/3659347803332945271_269-h-0.htm.xhtml#pgepubid00007,OEBPS/3659347803332945271_269-h-0.htm.xhtml#pgepubid00008,
@@ -166,7 +166,7 @@ pg-3031-wild-animals-i-have-known.epub,"Redruff, the Story of the Don Valley Par
 pg-3189-sketches-new-and-old.epub,The Notorious Jumping Frog of Calaveras County,Project Gutenberg,https://www.gutenberg.org/ebooks/3189,OEBPS/8326554539203573298_3189-h-0.htm.html#pgepubid00011,OEBPS/8326554539203573298_3189-h-1.htm.html#pgepubid00012,
 pg-710-love-of-life-and-other-stories.epub,Brown Wolf,Project Gutenberg,https://www.gutenberg.org/ebooks/710,OEBPS/7797953015242392439_710-h-6.htm.html#pgepubid00006,OEBPS/7797953015242392439_710-h-7.htm.html#pgepubid00007,
 pg-2429-lost-face.epub,That Spot,Project Gutenberg,https://www.gutenberg.org/ebooks/2429,OEBPS/4639063134480963727_2429-h-1.htm.html#pgepubid00014,OEBPS/4639063134480963727_2429-h-1.htm.html#pgepubid00016,
-pg-1870-reginald-in-russia-and-other-sketches.epub,The Mouse,Project Gutenberg,https://www.gutenberg.org/ebooks/1870,OEBPS/5049170997053640075_1870-h-2.htm.html#pgepubid00152,OEBPS/5049170997053640075_1870-h-2.htm.html#pg-footer-heading,
+pg-1870-reginald-in-russia-and-other-sketches.epub,The Mouse,Project Gutenberg,https://www.gutenberg.org/ebooks/1870,OEBPS/5049170997053640075_1870-h-2.htm.html#pgepubid00152,OEBPS/5049170997053640075_1870-h-2.htm.html#pg-footer-heading,,,Printed by Morrison & Gibb
 pg-2569-the-days-work.epub,The Maltese Cat,Project Gutenberg,https://www.gutenberg.org/ebooks/2569,OEBPS/6382903134481847699_2569-h-9.htm.html#pgepubid00011,OEBPS/6382903134481847699_2569-h-10.htm.html#pgepubid00012,
 pg-2147-the-works-of-edgar-allan-poe-volume-1.epub,The Gold-Bug,Project Gutenberg,https://www.gutenberg.org/ebooks/2147,OEBPS/6666393000358355088_2147-h-6.htm.html#pgepubid00008,OEBPS/6666393000358355088_2147-h-7.htm.html#pgepubid00009,
 pg-2148-works-of-poe-vol-2.epub,The Black Cat,Project Gutenberg,https://www.gutenberg.org/ebooks/2148,OEBPS/4462241475755897131_2148-h-7.htm.xhtml#pgepubid00009,OEBPS/4462241475755897131_2148-h-8.htm.xhtml#pgepubid00010,
@@ -182,6 +182,7 @@ pg-2852-the-hound-of-the-baskervilles.epub,The Hound of the Baskervilles,Project
 pg-14838-the-tale-of-peter-rabbit.epub,The Tale of Peter Rabbit,Project Gutenberg,https://www.gutenberg.org/ebooks/14838,,,
 pg-14407-the-tale-of-benjamin-bunny.epub,The Tale of Benjamin Bunny,Project Gutenberg,https://www.gutenberg.org/ebooks/14407,,,
 pg-14814-the-tale-of-jemima-puddle-duck.epub,The Tale of Jemima Puddle-Duck,Project Gutenberg,https://www.gutenberg.org/ebooks/14814,OEBPS/7285663678339061143_14814-h-0.htm.xhtml#pgepubid00001,,
-pg-38777-lad-a-dog.epub,Lad: A Dog,Project Gutenberg,https://www.gutenberg.org/ebooks/38777,OEBPS/4313263416278529056_38777-h-0.htm.html#pgepubid00011,,
+pg-38777-lad-a-dog.epub,Lad: A Dog,Project Gutenberg,https://www.gutenberg.org/ebooks/38777,OEBPS/4313263416278529056_38777-h-0.htm.html#pgepubid00011,,,,The following is a list of changes made to the original.
 pg-2795-bob-son-of-battle.epub,"Bob, Son of Battle",Project Gutenberg,https://www.gutenberg.org/ebooks/2795,,,
 pg-2818-beautiful-joe-an-autobiography.epub,Beautiful Joe,Project Gutenberg,https://www.gutenberg.org/ebooks/2818,,,
+pg-271-black-beauty.epub,Black Beauty,Project Gutenberg,https://www.gutenberg.org/ebooks/271,,,

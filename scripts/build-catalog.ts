@@ -4,7 +4,6 @@
 // public/covers/<id>.svg. Those folders are generated and are not committed.
 import { createHash } from 'node:crypto'
 import {
-  copyFileSync,
   existsSync,
   mkdirSync,
   readdirSync,
@@ -16,6 +15,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { strFromU8, unzipSync } from 'fflate'
 import { automatedCheckProblems } from './curationChecks.ts'
+import { SHRINK_VERSION, shrinkEpub } from './shrinkEpub.ts'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const RAW_DIR = path.join(ROOT, 'content', 'raw')
@@ -25,6 +25,8 @@ const OUT_CATALOG = path.join(ROOT, 'public', 'catalog')
 const OUT_TEXTS = path.join(ROOT, 'public', 'texts')
 const OUT_COVERS = path.join(ROOT, 'public', 'covers')
 
+/** A published EPUB over this many bytes is held back (an AI-written record) or flagged (a human-reviewed one). */
+export const MAX_EPUB_BYTES = 400 * 1024
 const WORDS_PER_MINUTE = 238
 const LICENSE = 'Project Gutenberg License'
 /** The media type of an EPUB 2 table of contents. */
@@ -164,6 +166,10 @@ export interface CatalogEntry extends Curation {
    * the Project Gutenberg licence section, which holds the END line.
    */
   endHref: string
+  /** Optional: text where the story really starts, inside its first chapter file. */
+  startAtText?: string
+  /** Optional: text where the story really ends, inside its last chapter file. */
+  endBeforeText?: string
   sha256: string
   source: string
   sourceUrl: string
@@ -180,6 +186,8 @@ export interface BuildResult {
   entries: CatalogEntry[]
   /** AI-written records held back because they failed an automated check, with the reasons. */
   heldBack: { id: string; reasons: string[] }[]
+  /** Records that ship although their published book is over the size limit (human-reviewed). */
+  flagged: { id: string; bytes: number }[]
   /** Every row of sources.csv, built and checked, whether or not it ships. */
   base: BaseEntry[]
   /** Rows that do not ship: no curation record, not yet reviewed by a person, or held back. */
@@ -949,22 +957,69 @@ const REQUIRED_CSV = ['file', 'story_title', 'source', 'source_url']
 export function decideShipping(
   records: CatalogEntry[],
   rangeText: Record<string, string>,
-): { shipped: CatalogEntry[]; heldBack: { id: string; reasons: string[] }[] } {
+  /** The published size of each record's book in bytes, by record id. Left out, no size rule applies. */
+  bookBytes: Record<string, number> = {},
+): {
+  shipped: CatalogEntry[]
+  heldBack: { id: string; reasons: string[] }[]
+  flagged: { id: string; bytes: number }[]
+} {
   const shipped: CatalogEntry[] = []
   const heldBack: { id: string; reasons: string[] }[] = []
+  const flagged: { id: string; bytes: number }[] = []
   for (const record of records) {
+    const bytes = bookBytes[record.id]
+    const tooBig = bytes !== undefined && bytes > MAX_EPUB_BYTES
     if (record.review === 'human') {
-      if (record.reviewed) shipped.push(record)
+      if (record.reviewed) {
+        shipped.push(record)
+        if (tooBig) flagged.push({ id: record.id, bytes })
+      }
       continue
     }
     const reasons = automatedCheckProblems(record, rangeText[record.id] ?? '')
+    if (tooBig)
+      reasons.push(
+        `the published book is ${Math.round(bytes / 1024)} KB, over the ${MAX_EPUB_BYTES / 1024} KB limit`,
+      )
     if (reasons.length === 0) shipped.push(record)
     else heldBack.push({ id: record.id, reasons })
   }
-  return { shipped, heldBack }
+  return { shipped, heldBack, flagged }
 }
 
-export function buildCatalog(): BuildResult {
+/**
+ * Cuts a story's text at a marker given in sources.csv (startAtText keeps the marker and what follows,
+ * endBeforeText drops the marker and what follows). Spaces in the marker match any gap, line breaks
+ * included. A marker that is missing or appears twice stops the build.
+ */
+export function cutAtText(
+  text: string,
+  marker: string,
+  keep: 'from' | 'before',
+  where: string,
+): string {
+  const words = marker.trim().split(/\s+/)
+  const pattern = words
+    .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('[\\s\\u0001]*')
+  const found = [...text.matchAll(new RegExp(pattern, 'g'))]
+  if (found.length === 0)
+    fail(`${where}: the text "${marker}" was not found in the story`)
+  if (found.length > 1)
+    fail(
+      `${where}: the text "${marker}" appears ${found.length} times in the story`,
+    )
+  const at = found[0].index
+  return keep === 'from' ? text.slice(at) : text.slice(0, at)
+}
+
+export interface BuildOptions {
+  /** The size in bytes of the book as published (after shrinking), by file name. Left out, no size rule applies. */
+  publishedBytes?: (file: string) => number | undefined
+}
+
+export function buildCatalog(options: BuildOptions = {}): BuildResult {
   if (!existsSync(SOURCES_CSV)) fail('content/sources.csv not found')
   const rows = parseCsv(readFileSync(SOURCES_CSV, 'utf8'))
   if (rows.length === 0) fail('content/sources.csv has no rows')
@@ -1044,6 +1099,11 @@ export function buildCatalog(): BuildResult {
     const notes = /\n\s*Transcriber['\u2019]s Notes?\s*\n/i.exec(marked)
     if (notes && notes.index > marked.length * 0.8)
       marked = marked.slice(0, notes.index)
+    const startAtText = row.startAtText?.trim() || undefined
+    const endBeforeText = row.endBeforeText?.trim() || undefined
+    if (startAtText) marked = cutAtText(marked, startAtText, 'from', where)
+    if (endBeforeText)
+      marked = cutAtText(marked, endBeforeText, 'before', where)
     const text = marked.split('\u0001').join('')
 
     const id = `pg-${number}-${slugify(row.story_title)}`
@@ -1072,6 +1132,8 @@ export function buildCatalog(): BuildResult {
       coverUrl: `/covers/${id}.svg`,
       startHref,
       endHref,
+      ...(startAtText && { startAtText }),
+      ...(endBeforeText && { endBeforeText }),
       sha256,
       source: row.source,
       sourceUrl: row.source_url,
@@ -1084,10 +1146,19 @@ export function buildCatalog(): BuildResult {
     if (f.endsWith('.epub') && !used.has(f))
       console.warn(`catalog: ${f} is in content/raw/ but not in sources.csv`)
   }
-  const { shipped: entries, heldBack } = decideShipping(
-    mergeCuration(base, loadCuration()),
-    rangeText,
-  )
+  const bookBytes: Record<string, number> = {}
+  if (options.publishedBytes) {
+    for (const entry of base) {
+      const number = /^\/texts\/pg-(\d+)\.epub$/.exec(entry.textUrl)?.[1] ?? ''
+      const bytes = options.publishedBytes(epubs.get(number) ?? '')
+      if (bytes !== undefined) bookBytes[entry.id] = bytes
+    }
+  }
+  const {
+    shipped: entries,
+    heldBack,
+    flagged,
+  } = decideShipping(mergeCuration(base, loadCuration()), rangeText, bookBytes)
   const shipped = new Set(entries.map((e) => e.id))
   const skipped = base.filter((e) => !shipped.has(e.id))
   // Only the books of entries that ship are published.
@@ -1097,18 +1168,41 @@ export function buildCatalog(): BuildResult {
   const shippedEpubs = new Map(
     [...epubs].filter(([number]) => shippedNumbers.has(number)),
   )
-  return { entries, heldBack, base, skipped, rangeText, epubs: shippedEpubs }
+  return {
+    entries,
+    heldBack,
+    flagged,
+    base,
+    skipped,
+    rangeText,
+    epubs: shippedEpubs,
+  }
 }
 
-function writeOutputs({ entries, epubs }: BuildResult): void {
+/** Where shrunk copies of the EPUBs are kept between builds (not committed). */
+const EPUB_CACHE = path.join(ROOT, '.cache', 'epubs')
+
+/** The copy of a raw EPUB that is published: its images scaled down (see scripts/shrinkEpub.ts). */
+export async function publishedEpub(file: string): Promise<Uint8Array> {
+  const raw = readFileSync(path.join(RAW_DIR, file))
+  const key = createHash('sha256').update(raw).digest('hex').slice(0, 24)
+  const cached = path.join(EPUB_CACHE, `${key}-v${SHRINK_VERSION}.epub`)
+  if (existsSync(cached)) return new Uint8Array(readFileSync(cached))
+  const shrunk = await shrinkEpub(new Uint8Array(raw))
+  mkdirSync(EPUB_CACHE, { recursive: true })
+  writeFileSync(cached, shrunk)
+  return shrunk
+}
+
+async function writeOutputs({ entries, epubs }: BuildResult): Promise<void> {
   for (const dir of [OUT_CATALOG, OUT_TEXTS, OUT_COVERS]) {
     rmSync(dir, { recursive: true, force: true })
     mkdirSync(dir, { recursive: true })
   }
   for (const [number, file] of epubs) {
-    copyFileSync(
-      path.join(RAW_DIR, file),
+    writeFileSync(
       path.join(OUT_TEXTS, `pg-${number}.epub`),
+      await publishedEpub(file),
     )
   }
   for (const e of entries) {
@@ -1146,10 +1240,15 @@ export function inputHash(): string {
     hash.update(readFileSync(path.join(content, file)))
   }
   hash.update(readFileSync(fileURLToPath(import.meta.url)))
+  hash.update(
+    readFileSync(
+      path.join(path.dirname(fileURLToPath(import.meta.url)), 'shrinkEpub.ts'),
+    ),
+  )
   return hash.digest('hex')
 }
 
-function main(): void {
+async function main(): Promise<void> {
   try {
     // Unchanged inputs and outputs still there: skip reading every EPUB again.
     const key = inputHash()
@@ -1163,12 +1262,22 @@ function main(): void {
       console.log('catalog: unchanged, skipped (CATALOG_FORCE=1 rebuilds)')
       return
     }
-    const result = buildCatalog()
-    writeOutputs(result)
+    // Shrink every book first, so the size rule sees the size that would be published.
+    const sizes = new Map<string, number>()
+    for (const f of readdirSync(RAW_DIR)) {
+      if (f.endsWith('.epub')) sizes.set(f, (await publishedEpub(f)).length)
+    }
+    const result = buildCatalog({ publishedBytes: (f) => sizes.get(f) })
+    await writeOutputs(result)
     mkdirSync(path.dirname(CACHE_FILE), { recursive: true })
     writeFileSync(CACHE_FILE, key)
     for (const h of result.heldBack) {
       console.warn(`catalog: HELD BACK ${h.id}: ${h.reasons.join('; ')}`)
+    }
+    for (const f of result.flagged) {
+      console.warn(
+        `catalog: FLAGGED ${f.id}: the published book is ${Math.round(f.bytes / 1024)} KB, over the ${MAX_EPUB_BYTES / 1024} KB limit (human-reviewed, still shipped)`,
+      )
     }
     const held = result.skipped.length
     console.log(
@@ -1189,4 +1298,4 @@ if (
   process.argv[1] &&
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 )
-  main()
+  await main()

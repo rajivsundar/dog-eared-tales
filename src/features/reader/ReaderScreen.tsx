@@ -151,6 +151,8 @@ function Reader({ id }: { id: string }) {
         await engine.open(found.textUrl, {
           startHref: found.startHref,
           endHref: found.endHref,
+          startAtText: found.startAtText,
+          endBeforeText: found.endBeforeText,
           locator: resume?.locator,
         })
         if (closed) {

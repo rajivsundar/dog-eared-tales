@@ -14,7 +14,13 @@ import {
   progressAt,
 } from './rangeRules'
 import { THEME_COLORS, readerCss, resolveTheme } from './readerStyle'
-import { removeBefore, removeFrom } from './trimDocument'
+import {
+  findText,
+  removeBefore,
+  removeBeforeText,
+  removeFrom,
+  removeFromText,
+} from './trimDocument'
 import type {
   LocationInfo,
   OpenOptions,
@@ -85,6 +91,8 @@ export class FoliateReaderEngine implements ReaderEngine {
   #range: StoryRange | null = null
   #start: { href: string; target: FoliateTarget } | null = null
   #end: { href: string; target: FoliateTarget } | null = null
+  #startAtText: string | null = null
+  #endBeforeText: string | null = null
   #wordsPerMinute = DEFAULT_WORDS_PER_MINUTE
   #style: ReaderStyle = { font: 'literata', sizeStep: 5, theme: 'system' }
   #last: PagePosition | null = null
@@ -123,6 +131,8 @@ export class FoliateReaderEngine implements ReaderEngine {
       this.#start = { href: startHref, target: start }
       this.#end = { href: endHref, target: end }
     }
+    this.#startAtText = options.startAtText || null
+    this.#endBeforeText = options.endBeforeText || null
     this.#range = await this.#measureRange(view.book)
 
     view.renderer.addEventListener('relocate', (e) =>
@@ -189,6 +199,8 @@ export class FoliateReaderEngine implements ReaderEngine {
     this.#range = null
     this.#start = null
     this.#end = null
+    this.#startAtText = null
+    this.#endBeforeText = null
     this.#last = null
     if (view) {
       view.close()
@@ -250,6 +262,11 @@ export class FoliateReaderEngine implements ReaderEngine {
 
   async #countSection(doc: Document, index: number): Promise<number> {
     if (!doc.body) return 0
+    if (this.#hasTextCut(index)) {
+      // Cut the page the way the reader will show it, then count what is left.
+      this.#trimPage(doc, index)
+      return countWords(doc.body.textContent ?? '')
+    }
     const text = doc.createRange()
     text.selectNodeContents(doc.body)
     if (this.#start && index === this.#start.target.index) {
@@ -279,13 +296,34 @@ export class FoliateReaderEngine implements ReaderEngine {
 
   /** Runs each time foliate-js loads a chapter file, before it is laid out in pages. */
   #onLoad({ doc, index }: { doc: Document; index: number }): void {
+    this.#trimPage(doc, index)
+  }
+
+  /** Whether the story ends or starts at some text inside this chapter file. */
+  #hasTextCut(index: number): boolean {
+    return (
+      Boolean(this.#endBeforeText && this.#end?.target.index === index) ||
+      Boolean(this.#startAtText && this.#start?.target.index === index)
+    )
+  }
+
+  /** Cuts a chapter file down to the story: first by anchors, then at the start and end texts. */
+  #trimPage(doc: Document, index: number): void {
     if (this.#end && index === this.#end.target.index) {
       const anchor = nodeAt(this.#end.target, doc)
       if (anchor) removeFrom(anchor)
+      if (this.#endBeforeText) {
+        const at = findText(doc, this.#endBeforeText)
+        if (at) removeFromText(at)
+      }
     }
     if (this.#start && index === this.#start.target.index) {
       const anchor = nodeAt(this.#start.target, doc)
       if (anchor) removeBefore(anchor)
+      if (this.#startAtText) {
+        const at = findText(doc, this.#startAtText)
+        if (at) removeBeforeText(at)
+      }
     }
   }
 

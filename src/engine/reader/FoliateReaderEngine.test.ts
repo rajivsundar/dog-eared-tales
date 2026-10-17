@@ -478,3 +478,21 @@ describe('style, callbacks and closing', () => {
     expect(t.view.nextCalls).toBe(0)
   })
 })
+
+describe('a story that starts and ends at some text inside its chapter file', () => {
+  it('shows only the text between the two, and counts only those words', async () => {
+    const t = setup()
+    await t.engine.open('/texts/pg-1.epub', {
+      ...STORY_A,
+      startAtText: 'a10 a11',
+      endBeforeText: 'a50',
+    })
+    const shown = squash(t.view.doc!)
+    expect(shown).toContain('a10 a11')
+    expect(shown).toContain('a49')
+    expect(shown).not.toContain('a9 ')
+    expect(shown).not.toContain('Story A')
+    expect(shown).not.toContain('a50')
+    expect(t.locations.at(-1)?.wordsLeft).toBe(40)
+  })
+})

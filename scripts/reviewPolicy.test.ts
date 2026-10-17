@@ -403,3 +403,38 @@ describe('schema errors still stop the build', () => {
     )
   })
 })
+
+describe('the 400 KB size rule', () => {
+  const KB = 1024
+  it('holds back an AI-written record whose published book is over 400 KB, with the size', () => {
+    const { shipped, heldBack, flagged } = decideShipping(
+      [record('big'), record('small')],
+      { big: STORY, small: STORY },
+      { big: 457 * KB, small: 399 * KB },
+    )
+    expect(shipped.map((e) => e.id)).toEqual(['small'])
+    expect(heldBack).toEqual([
+      {
+        id: 'big',
+        reasons: ['the published book is 457 KB, over the 400 KB limit'],
+      },
+    ])
+    expect(flagged).toEqual([])
+  })
+
+  it('flags a human-reviewed record that is over the limit but still ships it', () => {
+    const { shipped, heldBack, flagged } = decideShipping(
+      [record('a', { review: 'human', reviewed: true })],
+      { a: STORY },
+      { a: 961 * KB },
+    )
+    expect(shipped.map((e) => e.id)).toEqual(['a'])
+    expect(heldBack).toEqual([])
+    expect(flagged).toEqual([{ id: 'a', bytes: 961 * KB }])
+  })
+
+  it('applies no size rule when sizes are not given', () => {
+    const { shipped } = decideShipping([record('a')], { a: STORY })
+    expect(shipped.map((e) => e.id)).toEqual(['a'])
+  })
+})

@@ -24,6 +24,9 @@ export interface CatalogEntry {
   startHref: string
   /** Where the next story starts, so this one ends. Null for a single work. */
   endHref: string
+  /** Text where the story starts or ends inside its first or last chapter file (see sources.csv). */
+  startAtText?: string
+  endBeforeText?: string
   sha256: string
   source: string
   sourceUrl: string

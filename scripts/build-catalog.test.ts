@@ -15,6 +15,7 @@ import {
   countSyllables,
   countWords,
   coverSvg,
+  cutAtText,
   eraBandFor,
   findFirstLine,
   firstSentence,
@@ -684,5 +685,46 @@ describe('the build cache key', () => {
     const first = inputHash()
     expect(first).toMatch(/^[0-9a-f]{64}$/)
     expect(inputHash()).toBe(first)
+  })
+})
+
+describe('cutting a story at some text', () => {
+  it('keeps the text and what follows with startAtText, and drops the text and what follows with endBeforeText', () => {
+    const story =
+      'Notes.\nChapter one. It begins.\nIt ends.\nPrinted by\n Morrison & Gibb'
+    expect(cutAtText(story, 'It begins', 'from', 'x')).toBe(
+      'It begins.\nIt ends.\nPrinted by\n Morrison & Gibb',
+    )
+    expect(cutAtText(story, 'Printed by Morrison & Gibb', 'before', 'x')).toBe(
+      'Notes.\nChapter one. It begins.\nIt ends.\n',
+    )
+  })
+
+  it('stops the build when the text is missing or appears twice', () => {
+    expect(() => cutAtText('one two', 'three', 'before', 'row 2')).toThrow(
+      /was not found/,
+    )
+    expect(() => cutAtText('go go', 'go', 'before', 'row 2')).toThrow(
+      /appears 2 times/,
+    )
+  })
+
+  it('ends Lad: A Dog before the transcriber’s list of corrections', () => {
+    const lad = result.base.find((b) => b.id === 'pg-38777-lad-a-dog')!
+    expect(lad.endBeforeText).toBe(
+      'The following is a list of changes made to the original.',
+    )
+    const text = result.rangeText[lad.id]
+    expect(text).not.toContain('list of changes made')
+    expect(text).not.toContain('Nineteenth Printing')
+    expect(text.trimEnd().endsWith('Pompton Lakes,\n New Jersey.')).toBe(true)
+  })
+
+  it('ends The Mouse before the printer’s line', () => {
+    const mouse = result.base.find((b) => b.id === 'pg-1870-the-mouse')!
+    expect(mouse.endBeforeText).toBe('Printed by Morrison & Gibb')
+    const text = result.rangeText[mouse.id]
+    expect(text).not.toContain('Morrison')
+    expect(text.trimEnd().endsWith('at a railway station.”')).toBe(true)
   })
 })
