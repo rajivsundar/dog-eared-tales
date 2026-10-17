@@ -206,6 +206,9 @@ describe('the front-matter check', () => {
     expect(frontMatterIn('Produced by Jane Doe. Chapter one.')).toEqual([
       '"Produced by"',
     ])
+    expect(frontMatterIn('\n \nProduced by Jane Doe\n \nChapter one.')).toEqual(
+      ['"Produced by"'],
+    )
     expect(frontMatterIn("Transcriber's Note: spelling kept.")).toEqual([
       'a transcriber note',
     ])
@@ -216,6 +219,14 @@ describe('the front-matter check', () => {
 
   it('passes a text range that opens with the story', () => {
     expect(frontMatterIn(STORY)).toEqual([])
+  })
+
+  it('ignores "produced by" inside a sentence at the start of the story', () => {
+    expect(
+      frontMatterIn(
+        'Society is produced by our wants, and government by our wickedness.',
+      ),
+    ).toEqual([])
   })
 
   it('ignores the same words deep inside the story', () => {
@@ -294,6 +305,14 @@ describe('schema errors still stop the build', () => {
       merge({ contentNotes: ['sexual themes', 'threat to a child'] })[0]
         .contentNotes,
     ).toEqual(['sexual themes', 'threat to a child'])
+  })
+
+  it('accepts an optional yearBasis and refuses an unknown one', () => {
+    expect(merge({})[0].yearBasis).toBeUndefined()
+    expect(merge({ yearBasis: 'collection-fallback' })[0].yearBasis).toBe(
+      'collection-fallback',
+    )
+    expect(() => merge({ yearBasis: 'guess' })).toThrow(/yearBasis must be/)
   })
 
   it('refuses a hook that is too long', () => {

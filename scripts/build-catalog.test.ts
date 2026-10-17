@@ -9,6 +9,7 @@ import {
   FORMS,
   GENRES,
   MOODS,
+  YEAR_BASES,
   buildCatalog,
   countSentences,
   countSyllables,
@@ -235,10 +236,11 @@ describe('EPUB 2 books (no nav document, an NCX contents list)', () => {
   it('finds the licence of an EPUB 2 whole book from the Gutenberg footer heading', () => {
     const prophet = entry('pg-58585-the-prophet')
     expect(prophet.isCollection).toBe(false)
-    expect(prophet.startHref).toMatch(/#pgepubid00000$/)
+    // Starts at the title of the poem itself, past the copyright page and list of books.
+    expect(prophet.startHref).toMatch(/#pgepubid00005$/)
     expect(prophet.endHref).toMatch(/#pg-footer-heading$/)
     expect(result.rangeText[prophet.id]).not.toContain('Project Gutenberg')
-    expect(prophet.wordCount).toBe(12580)
+    expect(prophet.wordCount).toBe(12336)
   })
 
   it('gives each EPUB 2 story the right word count from the inventory', () => {
@@ -409,6 +411,35 @@ describe('helpers', () => {
 })
 
 const ESSAYS = new Set([
+  'pg-61-the-communist-manifesto',
+  'pg-132-chapter-i-laying-plans',
+  'pg-132-chapter-iii-attack-by-stratagem',
+  'pg-132-chapter-vi-weak-points-and-strong',
+  'pg-147-of-the-origin-and-design-of-government-in-general-with-concise-remarks-on-the-english-constitution',
+  'pg-147-thoughts-on-the-present-state-of-american-affairs',
+  'pg-205-where-i-lived-and-what-i-lived-for',
+  'pg-205-reading',
+  'pg-205-solitude',
+  'pg-216-the-tao-teh-king',
+  'pg-368-acres-of-diamonds',
+  'pg-408-i-of-our-spiritual-strivings',
+  'pg-408-xi-of-the-passing-of-the-first-born',
+  'pg-408-xiv-of-the-sorrow-songs',
+  'pg-1232-chapter-xvii-concerning-cruelty-and-clemency-and-whether-it-is-better-to-be-loved-than-feared',
+  'pg-1232-chapter-xviii-concerning-the-way-in-which-princes-should-keep-faith',
+  'pg-1232-chapter-xxv-what-fortune-can-effect-in-human-affairs-and-how-to-withstand-her',
+  'pg-1656-apology',
+  'pg-2376-chapter-i-a-slave-among-slaves',
+  'pg-2376-chapter-xiv-the-atlanta-exposition-address',
+  'pg-2680-the-second-book',
+  'pg-2680-the-fourth-book',
+  'pg-2680-the-sixth-book',
+  'pg-4507-as-a-man-thinketh',
+  'pg-5827-chapter-i-appearance-and-reality',
+  'pg-5827-chapter-xv-the-value-of-philosophy',
+  'pg-11224-chapter-ii-what-utilitarianism-is',
+  'pg-34901-chapter-ii-of-the-liberty-of-thought-and-discussion',
+  'pg-58585-the-prophet',
   'pg-71-on-the-duty-of-civil-disobedience',
   'pg-1080-a-modest-proposal',
   'pg-2944-compensation',
@@ -418,6 +449,7 @@ const ESSAYS = new Set([
 
 const CURATION_KEYS = [
   'year',
+  'yearBasis',
   'eraBand',
   'form',
   'genres',
@@ -461,6 +493,26 @@ describe('curation in the catalog', () => {
       expect(e.generatedBy, e.id).toBeTruthy()
       expect(typeof e.reviewed, e.id).toBe('boolean')
     }
+  })
+
+  it('gives every AI-written record a year basis', () => {
+    for (const e of result.entries) {
+      if (e.review === 'auto') {
+        expect(YEAR_BASES, e.id).toContain(e.yearBasis)
+      } else if (e.yearBasis !== undefined) {
+        expect(YEAR_BASES, e.id).toContain(e.yearBasis)
+      }
+    }
+  })
+
+  it('tags "Of the Coming of John" as a story, though it sits in a book of essays', () => {
+    const find = (id: string): CatalogEntry | undefined =>
+      result.entries.find((e) => e.id === id)
+    expect(find('pg-408-xiii-of-the-coming-of-john')?.form).toBe('story')
+    expect(find('pg-408-xiii-of-the-coming-of-john')?.genres).toEqual([
+      'literary',
+    ])
+    expect(find('pg-408-i-of-our-spiritual-strivings')?.form).toBe('essay')
   })
 
   it('uses the form rule: fiction by word count, non-fiction as essay', () => {

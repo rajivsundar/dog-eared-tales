@@ -29,6 +29,8 @@ export interface CatalogEntry {
   sourceUrl: string
   license: string
   year: number
+  /** How the year was found; absent on records written before the field existed. */
+  yearBasis?: 'first-print' | 'collection-fallback' | 'unverified'
   eraBand: string
   form: 'story' | 'novelette' | 'novella' | 'essay'
   genres: string[]

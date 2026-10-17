@@ -87,12 +87,18 @@ export const ERA_BANDS = [
   '1900-1930',
 ] as const
 export const FORMS = ['story', 'novelette', 'novella', 'essay'] as const
+export const YEAR_BASES = [
+  'first-print',
+  'collection-fallback',
+  'unverified',
+] as const
 
 export type Genre = (typeof GENRES)[number]
 export type Mood = (typeof MOODS)[number]
 export type ContentNote = (typeof CONTENT_NOTES)[number]
 export type EraBand = (typeof ERA_BANDS)[number]
 export type Form = (typeof FORMS)[number]
+export type YearBasis = (typeof YEAR_BASES)[number]
 export type Review = 'human' | 'auto'
 export type ReadingBand = 'easy' | 'medium' | 'challenging'
 
@@ -107,6 +113,12 @@ export interface ReadingLevel {
 /** What content/curation.json holds for each entry. */
 export interface Curation {
   year: number
+  /**
+   * Optional. How the year was found: 'first-print' (confirmed first appearance in print),
+   * 'collection-fallback' (the first book collection's year, because the periodical date could
+   * not be confirmed) or 'unverified' (not checked against a source).
+   */
+  yearBasis?: YearBasis
   eraBand: EraBand
   form: Form
   genres: Genre[]
@@ -824,6 +836,14 @@ export function mergeCuration(
     const year = r.year
     if (typeof year !== 'number' || !Number.isInteger(year))
       fail(`${where}: year must be a whole number`)
+    const yearBasis = r.yearBasis
+    if (
+      yearBasis !== undefined &&
+      !(YEAR_BASES as readonly unknown[]).includes(yearBasis)
+    )
+      fail(
+        `${where}: yearBasis must be "first-print", "collection-fallback" or "unverified"`,
+      )
     const eraBand = r.eraBand
     if (!(ERA_BANDS as readonly unknown[]).includes(eraBand))
       fail(`${where}: eraBand is missing or not allowed`)
@@ -874,6 +894,7 @@ export function mergeCuration(
         ...entry,
         readingLevel,
         year,
+        ...(yearBasis !== undefined && { yearBasis: yearBasis as YearBasis }),
         eraBand: eraBand as EraBand,
         form: form as Form,
         genres: pickList(where, 'genres', r.genres, GENRES, 1, 3),

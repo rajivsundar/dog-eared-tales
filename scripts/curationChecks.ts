@@ -97,7 +97,8 @@ export function automatedCheckProblems(
 const FRONT_MATTER_WINDOW = 1500
 
 const FRONT_MATTER: { label: string; pattern: RegExp }[] = [
-  { label: '"Produced by"', pattern: /\bproduced\s+by\b/i },
+  // At the start of a line: the credit, not a sentence such as "Society is produced by our wants".
+  { label: '"Produced by"', pattern: /(?:^|\n)[ \t]*produced\s+by\b/i },
   { label: '"E-text prepared by"', pattern: /\be-?text\s+prepared\s+by\b/i },
   { label: 'a credits line', pattern: /\bdistributed\s+proofreading\b/i },
   { label: 'a transcriber note', pattern: /\btranscriber['’]?s?\s+notes?\b/i },
