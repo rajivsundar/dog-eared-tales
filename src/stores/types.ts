@@ -114,6 +114,10 @@ export interface Settings {
   installOffered?: boolean
   /** The "Tune your picks" card on Your Shortlist was dismissed. */
   tuneDismissed?: boolean
+  /** Seasonal themes (welcome art, subtitle, Tales for Longer Nights). On unless set to false. */
+  seasonalThemes?: boolean
+  /** The works in today's seasonal row, kept so their books can be stored for offline. */
+  talesRow?: DailyShortlist
 }
 
 export interface ProfileStore {

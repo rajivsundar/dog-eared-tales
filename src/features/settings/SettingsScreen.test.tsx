@@ -31,6 +31,7 @@ vi.mock('../../stores', async () => {
     profileManager: delegateManager(() => h.current),
     eventLog: delegate('eventLog'),
     profileStore: delegate('profileStore'),
+    settingsStore: delegate('settingsStore'),
   }
 })
 
@@ -122,5 +123,39 @@ describe('About', () => {
     await stores.eventLog.append({ workId: 'story-1', type: 'finished' })
     fireEvent.click(redo)
     expect(stores.events).toHaveLength(1)
+  })
+})
+
+describe('Seasonal themes', () => {
+  it('is on by default, can be turned off, and is remembered for this profile', async () => {
+    renderSettings()
+    const toggle = await screen.findByRole('switch', {
+      name: /Seasonal themes/,
+    })
+    expect(toggle).toBeChecked()
+    fireEvent.click(toggle)
+    await vi.waitFor(async () =>
+      expect((await stores.settingsStore.get()).seasonalThemes).toBe(false),
+    )
+    expect(toggle).not.toBeChecked()
+    fireEvent.click(toggle)
+    await vi.waitFor(async () =>
+      expect((await stores.settingsStore.get()).seasonalThemes).toBe(true),
+    )
+  })
+
+  it('shows the saved choice when Settings opens again', async () => {
+    await stores.settingsStore.update({ seasonalThemes: false })
+    renderSettings()
+    expect(
+      await screen.findByRole('switch', { name: /Seasonal themes/ }),
+    ).not.toBeChecked()
+  })
+
+  it('has a link to preview the welcome screen', async () => {
+    renderSettings()
+    expect(
+      await screen.findByRole('link', { name: 'See the welcome screen' }),
+    ).toHaveAttribute('href', '/welcome?preview=1')
   })
 })

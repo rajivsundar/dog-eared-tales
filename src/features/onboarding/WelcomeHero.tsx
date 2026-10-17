@@ -1,5 +1,6 @@
 import { useId, useRef, useState } from 'react'
 import type { RefObject } from 'react'
+import type { SeasonArt } from '../../app/seasonArt/types'
 import type { WelcomeView } from './featuredStory'
 import { minutesLabel } from '../detail/labels'
 
@@ -10,6 +11,8 @@ interface Props {
   busy: boolean
   onReadNow: () => void
   onPickMoods: () => void
+  /** The season's drawings, once loaded. Nothing is drawn without a season. */
+  art?: SeasonArt | null
 }
 
 const primary =
@@ -31,6 +34,7 @@ export function WelcomeHero({
   busy,
   onReadNow,
   onPickMoods,
+  art = null,
 }: Props) {
   const { content, featured, covers } = view
   const whyId = useId()
@@ -40,31 +44,39 @@ export function WelcomeHero({
   return (
     <section
       aria-labelledby="welcome-title"
-      className="mx-auto grid max-w-5xl items-center gap-8 py-4 lg:grid-cols-2 lg:gap-14 lg:py-12"
+      className="relative isolate mx-auto grid max-w-5xl items-center gap-8 py-4 lg:grid-cols-2 lg:gap-14 lg:py-12"
     >
+      {art && <art.Leaves />}
       {/* Art: a fan of three real covers. Decorative, so it is hidden from screen readers. */}
-      <div
-        aria-hidden="true"
-        data-testid="cover-fan"
-        className="flex min-h-48 items-center justify-center lg:min-h-96"
-      >
-        {covers.map((cover, i) => (
-          <img
-            key={cover.id}
-            src={cover.coverUrl}
-            alt=""
-            style={{
-              transform: `rotate(${FAN[i].rotate})`,
-              marginLeft: i === 0 ? 0 : FAN[i].shift,
-              zIndex: FAN[i].z,
-            }}
-            className="h-44 w-28 rounded-lg border border-line object-cover shadow-xl sm:h-56 sm:w-36 lg:h-72 lg:w-48"
-          />
-        ))}
+      <div className="flex flex-col items-center">
+        <div
+          aria-hidden="true"
+          data-testid="cover-fan"
+          className="flex min-h-48 items-center justify-center lg:min-h-80"
+        >
+          {covers.map((cover, i) => (
+            <img
+              key={cover.id}
+              src={cover.coverUrl}
+              alt=""
+              style={{
+                transform: `rotate(${FAN[i].rotate})`,
+                marginLeft: i === 0 ? 0 : FAN[i].shift,
+                zIndex: FAN[i].z,
+              }}
+              className="h-44 w-28 rounded-lg border border-line object-cover shadow-xl sm:h-56 sm:w-36 lg:h-72 lg:w-48"
+            />
+          ))}
+        </div>
+        {art && (
+          <div className="-mt-4 w-44 sm:w-56 lg:w-64">
+            <art.Scene />
+          </div>
+        )}
       </div>
 
       {/* Text */}
-      <div className="text-center lg:text-left">
+      <div className="relative z-10 text-center lg:text-left">
         <p className="font-serif text-lg font-bold tracking-wide text-accent">
           Twice Told
         </p>

@@ -52,6 +52,8 @@ export async function syncOfflineTexts(now: Date = new Date()): Promise<void> {
       catalog,
       shortlist: settings.shortlist,
       longList: settings.longList,
+      talesRow:
+        settings.seasonalThemes === false ? undefined : settings.talesRow,
       library,
       progress,
       events,

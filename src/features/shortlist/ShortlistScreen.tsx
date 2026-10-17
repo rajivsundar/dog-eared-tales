@@ -24,7 +24,11 @@ import {
 import { TuneCard } from '../onboarding/TuneCard'
 import { hasAnsweredCards } from '../onboarding/finishOnboarding'
 import { OfflineBadge } from '../offline/OfflineBadge'
+import { useSeasonArt } from '../../app/seasonArt/useSeasonArt'
+import { useSeason } from '../../app/useSeason'
 import { ReadingAs } from '../profiles/ReadingAs'
+import { TalesSection } from './TalesSection'
+import { loadTalesRow, removeTale, undoRemoveTale } from './talesRow'
 import { useAutoCache, useCachedTexts } from '../offline/useOffline'
 import { LongListSection } from './LongListSection'
 import {
@@ -47,7 +51,7 @@ interface Removed {
   key: number
   workId: string
   /** Which list the work was removed from. */
-  list: 'short' | 'long'
+  list: 'short' | 'long' | 'tales'
   previous: ShortlistPick[]
 }
 
@@ -65,6 +69,25 @@ export function ShortlistScreen() {
   const [showTune, setShowTune] = useState(false)
   const [longPicks, setLongPicks] = useState<ShortlistPick[]>([])
   const [sitting, setSitting] = useState(15)
+  const [loadedTales, setTales] = useState<ShortlistPick[]>([])
+  const { season } = useSeason(now)
+  const art = useSeasonArt(season?.art)
+  // Nothing is shown (or kept for offline) once the season is over or switched off.
+  const tales = season ? loadedTales : []
+
+  // The seasonal row (Tales for Longer Nights), while a season is on and seasonal themes are too.
+  useEffect(() => {
+    if (!catalogDeps || !season) return
+    let cancelled = false
+    loadTalesRow(catalogDeps, season, now)
+      .then((row) => {
+        if (!cancelled) setTales(row)
+      })
+      .catch((error: unknown) => console.error(error))
+    return () => {
+      cancelled = true
+    }
+  }, [catalogDeps, season, now])
 
   useEffect(() => {
     let cancelled = false
@@ -122,13 +145,16 @@ export function ShortlistScreen() {
       '|',
       ...longPicks.map((p) => p.entry.id),
       '|',
+      ...tales.map((p) => p.entry.id),
+      '|',
       ...[...dogEar.ids],
     ].join(','),
   )
 
   const openShort = picks?.find((p) => p.entry.id === openId)
   const openLong = longPicks.find((p) => p.entry.id === openId)
-  const open = openShort ?? openLong
+  const openTale = tales.find((p) => p.entry.id === openId)
+  const open = openShort ?? openLong ?? openTale
 
   const fail = (error: unknown): void => {
     console.error(error)
@@ -149,6 +175,16 @@ export function ShortlistScreen() {
     if (!catalogDeps || !picks) return
     setOpenId(null)
     dogEar.dismiss()
+    if (season && tales.some((p) => p.entry.id === id)) {
+      const previous = tales
+      removeTale(catalogDeps, season, previous, id, new Date())
+        .then((next) => {
+          setTales(next)
+          setRemoved({ key: Date.now(), workId: id, list: 'tales', previous })
+        })
+        .catch(fail)
+      return
+    }
     const isLong = longPicks.some((p) => p.entry.id === id)
     const previous = isLong ? longPicks : picks
     const shortIds = picks.map((p) => p.entry.id)
@@ -176,7 +212,10 @@ export function ShortlistScreen() {
     if (!catalogDeps || !removed) return
     const { previous, workId, list } = removed
     setRemoved(null)
-    if (list === 'long') {
+    if (list === 'tales') {
+      setTales(previous)
+      undoRemoveTale(catalogDeps, previous, workId, new Date()).catch(fail)
+    } else if (list === 'long') {
       setLongPicks(previous)
       undoRemoveLongList(catalogDeps, previous, workId, new Date()).catch(fail)
     } else {
@@ -201,6 +240,7 @@ export function ShortlistScreen() {
           id="shortlist-title"
           className="font-serif text-2xl font-bold sm:text-3xl"
         >
+          {art && <art.Accent />}
           {shortlistTitle(now)}
         </h2>
 
@@ -250,6 +290,15 @@ export function ShortlistScreen() {
           </ul>
         )}
       </section>
+
+      {season && tales.length > 0 && (
+        <TalesSection
+          title={season.talesRow.title}
+          picks={tales}
+          cached={cached}
+          onOpen={openSheet}
+        />
+      )}
 
       {longPicks.length > 0 && (
         <LongListSection

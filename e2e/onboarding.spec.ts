@@ -279,6 +279,7 @@ test('the Tune card can be dismissed, and stays dismissed after a reload', async
 test('"Pick my moods first": moods, then Your Shortlist, with no taste cards', async ({
   page,
 }) => {
+  await page.clock.setFixedTime(MARCH) // out of season: no seasonal row
   await page.goto('/')
   await page.getByRole('button', { name: 'Pick my moods first' }).click()
 
@@ -323,6 +324,7 @@ test('"Pick my moods first": moods, then Your Shortlist, with no taste cards', a
 test('Skip on the mood board goes straight to the starter mix', async ({
   page,
 }) => {
+  await page.clock.setFixedTime(MARCH) // out of season: no seasonal row
   await page.goto('/')
   await page.getByRole('button', { name: 'Pick my moods first' }).click()
   await page.getByRole('button', { name: 'Skip', exact: true }).click()

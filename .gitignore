@@ -6,3 +6,6 @@ test-results
 public/catalog/
 public/texts/
 public/covers/
+
+# Word lock files
+~$*

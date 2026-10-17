@@ -7,6 +7,7 @@ import { useInstallMode } from '../../pwa/install'
 import { eventLog, profileStore } from '../../stores'
 import { DataSection } from '../data/DataSection'
 import { ProfilesSection } from '../profiles/ProfilesSection'
+import { SeasonalToggle } from './SeasonalToggle'
 import { StorageSection } from '../storage/StorageSection'
 import type { Profile } from '../../stores'
 
@@ -152,6 +153,8 @@ export function SettingsScreen() {
 
       <ProfilesSection />
 
+      <SeasonalToggle />
+
       {installMode !== 'hidden' && (
         <section aria-labelledby="install-title" className="mt-10">
           <h2 id="install-title" className="font-serif text-2xl font-bold">
@@ -187,6 +190,15 @@ export function SettingsScreen() {
           className="mt-3 inline-flex min-h-11 items-center rounded-full border border-line px-5 font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           Redo onboarding
+        </Link>
+        <p className="mt-4 text-muted">
+          Take another look at the welcome screen. Nothing is changed.
+        </p>
+        <Link
+          to="/welcome?preview=1"
+          className="mt-3 inline-flex min-h-11 items-center rounded-full border border-line px-5 font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        >
+          See the welcome screen
         </Link>
       </section>
 

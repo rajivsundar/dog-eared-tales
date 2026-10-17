@@ -27,3 +27,10 @@ export {
   rotatedOut,
 } from './longList'
 export type { LongListPick } from './longList'
+export {
+  LONG_NIGHTS_SIZE,
+  isLongNightsTale,
+  rankLongNights,
+  recommendLongNights,
+} from './longNights'
+export type { LongNightsPick } from './longNights'

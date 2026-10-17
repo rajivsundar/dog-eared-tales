@@ -61,7 +61,8 @@ describe('App', () => {
     expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull()
   })
 
-  it('shows the name and tagline on the home page', async () => {
+  it('shows the name and tagline on the home page (out of season)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date(2026, 8, 16, 12) })
     // A returning reader: there is already something in the event log.
     await eventLog.append({ workId: 'x', type: 'open' })
     // These two stand-in stories are too bare for the recommender; that is not what this test checks.
@@ -71,12 +72,13 @@ describe('App', () => {
       await screen.findByRole('heading', { name: 'Twice Told' }),
     ).toBeInTheDocument()
     expect(
-      screen.getByText(
+      await screen.findByText(
         'Great free stories, picked for you. Start short. Fall for the classics.',
       ),
     ).toBeInTheDocument()
     await screen.findByRole('heading', { name: /Shortlist/ })
     error.mockRestore()
+    vi.useRealTimers()
   })
 
   it('lists every catalog entry at /all as a link to its reader', async () => {

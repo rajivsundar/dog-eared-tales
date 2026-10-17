@@ -219,6 +219,7 @@ test('an existing reader’s data moves into the profile "Me", and the old datab
       }),
   )
 
+  await page.clock.setFixedTime(new Date(2026, 8, 16, 11, 0)) // out of season
   await page.goto('/')
   // Not a first-time reader: the shortlist, not the welcome.
   await expect(page.getByRole('listitem')).toHaveCount(6)

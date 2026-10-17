@@ -72,7 +72,7 @@ beforeEach(() => {
   )
   vi.useFakeTimers({
     shouldAdvanceTime: true,
-    now: new Date(2026, 9, 16, 9, 0),
+    now: new Date(2026, 8, 16, 9, 0),
   })
 })
 afterEach(() => {
@@ -105,7 +105,7 @@ describe('Your Shortlist', () => {
   })
 
   it("is called Tonight's Shortlist in the evening", async () => {
-    vi.setSystemTime(new Date(2026, 9, 16, 19, 0))
+    vi.setSystemTime(new Date(2026, 8, 16, 19, 0))
     renderHome()
     expect(
       await screen.findByRole('heading', { name: "Tonight's Shortlist" }),
@@ -191,7 +191,7 @@ describe('detail sheet', () => {
   it('says "from <book>" for a story in a collection', async () => {
     stores.settingsStore.update({
       shortlist: {
-        date: '2026-10-16',
+        date: '2026-09-16',
         picks: [
           { workId: 'story-1', reason: 'Because you like eerie stories' },
         ],

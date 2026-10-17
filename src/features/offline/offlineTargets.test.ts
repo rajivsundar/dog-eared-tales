@@ -92,3 +92,14 @@ describe('which books to keep for offline', () => {
     )
   })
 })
+
+describe('the seasonal row', () => {
+  it("includes today's Tales for Longer Nights, and ignores another day's", () => {
+    expect(
+      offlineTargets({ ...base, talesRow: list(TODAY, 'story-5') }),
+    ).toEqual(['/texts/pg-5.epub'])
+    expect(
+      offlineTargets({ ...base, talesRow: list('2020-01-01', 'story-5') }),
+    ).toEqual([])
+  })
+})

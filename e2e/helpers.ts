@@ -33,11 +33,18 @@ export async function waitForReader(page: Page): Promise<void> {
  * Opens the app as a returning reader. A fresh browser starts onboarding, so this skips it
  * (Pick my moods first, then Skip) and waits for Your Shortlist.
  */
-export async function startApp(page: Page): Promise<void> {
+export async function startApp(
+  page: Page,
+  /** The date the app sees: out of season by default, so no seasonal row. 'keep' leaves the clock alone. */
+  date: Date | 'keep' = new Date(2026, 8, 16, 11, 0),
+): Promise<void> {
   await mapProfileDb(page)
+  if (date !== 'keep') await page.clock.setFixedTime(date)
   await page.goto('/')
   const welcome = page.getByRole('button', { name: 'Pick my moods first' })
-  const cards = page.getByRole('listitem')
+  const cards = page
+    .getByRole('region', { name: /Shortlist/ })
+    .getByRole('listitem')
   await expect(welcome.or(cards.first())).toBeVisible()
   if (await welcome.isVisible()) {
     await welcome.click()

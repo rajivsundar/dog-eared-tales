@@ -462,3 +462,75 @@ describe('Redo onboarding (the full flow)', () => {
     expect((await stores.profileStore.get())?.ladderLevel).toBe(0)
   })
 })
+
+describe('the fall artwork on the welcome page', () => {
+  it('draws the reading chair and falling leaves in fall', async () => {
+    setDate(2026, 10, 16)
+    await welcome()
+    expect(await screen.findByTestId('season-scene')).toBeInTheDocument()
+    expect(screen.getByTestId('season-leaves')).toBeInTheDocument()
+    // Decorative: hidden from screen readers.
+    expect(screen.getByTestId('season-scene')).toHaveAttribute(
+      'aria-hidden',
+      'true',
+    )
+  })
+
+  it('draws nothing out of season', async () => {
+    setDate(2026, 12, 1)
+    await welcome()
+    expect(screen.queryByTestId('season-scene')).toBeNull()
+    expect(screen.queryByTestId('season-leaves')).toBeNull()
+  })
+
+  it('draws nothing, and uses the defaults, when seasonal themes are off', async () => {
+    setDate(2026, 10, 16)
+    await stores.settingsStore.update({ seasonalThemes: false })
+    renderOnboarding()
+    await screen.findByTestId('featured-story')
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+      'Great free stories, picked for you.',
+    )
+    expect(
+      screen.getByRole('button', { name: 'Read a short story now' }),
+    ).toBeInTheDocument()
+    expect(screen.queryByTestId('season-scene')).toBeNull()
+    expect(screen.queryByTestId('season-leaves')).toBeNull()
+  })
+})
+
+describe('the welcome preview (/welcome?preview=1)', () => {
+  it('shows the welcome screen and changes no data', async () => {
+    setDate(2026, 10, 16)
+    await stores.eventLog.append({ workId: 'story-1', type: 'finished' })
+    await stores.libraryStore.save('story-2')
+    const before = JSON.stringify({
+      events: stores.events,
+      library: [...stores.library],
+      settings: await stores.settingsStore.get(),
+      profile: await stores.profileStore.get(),
+    })
+    renderOnboarding('/welcome?preview=1')
+    await screen.findByTestId('featured-story')
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Preview of the welcome screen. Nothing is saved.',
+    )
+    // The buttons do nothing in a preview.
+    expect(
+      screen.getByRole('button', { name: 'Turn over a new leaf' }),
+    ).toBeDisabled()
+    expect(
+      screen.getByRole('button', { name: 'Pick my moods first' }),
+    ).toBeDisabled()
+    expect(
+      JSON.stringify({
+        events: stores.events,
+        library: [...stores.library],
+        settings: await stores.settingsStore.get(),
+        profile: await stores.profileStore.get(),
+      }),
+    ).toBe(before)
+    fireEvent.click(screen.getByRole('link', { name: 'Back to Settings' }))
+    expect(await screen.findByText('SETTINGS')).toBeInTheDocument()
+  })
+})

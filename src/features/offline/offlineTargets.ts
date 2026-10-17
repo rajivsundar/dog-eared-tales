@@ -11,6 +11,8 @@ export interface OfflineInput {
   catalog: CatalogEntry[]
   shortlist?: DailyShortlist
   longList?: DailyShortlist
+  /** The seasonal row (Tales for Longer Nights). */
+  talesRow?: DailyShortlist
   library: SavedWork[]
   progress: Progress[]
   events: ReaderEvent[]
@@ -19,14 +21,14 @@ export interface OfflineInput {
 }
 
 /**
- * The book files to keep for offline reading: every pick on today's Your Shortlist and Your Long
- * List, every Dog-eared work, and every work under Reading. Each file once, even when several
+ * The book files to keep for offline reading: every pick on today's Your Shortlist, Your Long
+ * List and seasonal row, every Dog-eared work, and every work under Reading. Each file once, even when several
  * works share it.
  */
 export function offlineTargets(input: OfflineInput): string[] {
   const byId = new Map(input.catalog.map((e) => [e.id, e]))
   const ids: string[] = []
-  for (const list of [input.shortlist, input.longList]) {
+  for (const list of [input.shortlist, input.longList, input.talesRow]) {
     if (list && list.date === input.today) {
       ids.push(...list.picks.map((p) => p.workId))
     }

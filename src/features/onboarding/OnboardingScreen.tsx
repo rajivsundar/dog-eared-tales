@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { useNavigate, useSearchParams } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
+import { useSeasonArt } from '../../app/seasonArt/useSeasonArt'
 import { welcomeContent } from '../../app/seasons'
 import { type CatalogEntry, loadCatalog } from '../../catalog'
 import { type CardAnswer, pickTasteCards } from '../../engine/recommend'
@@ -29,6 +30,9 @@ export default function OnboardingScreen() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const full = params.get('redo') === '1'
+  // A preview (from Settings → About) shows the welcome screen and changes nothing.
+  const preview = params.get('preview') === '1'
+  const [seasonal, setSeasonal] = useState(true)
 
   const [step, setStep] = useState<Step>(full ? 'mood' : 'welcome')
   const [now] = useState(() => new Date())
@@ -56,12 +60,26 @@ export default function OnboardingScreen() {
     }
   }, [])
 
+  useEffect(() => {
+    let cancelled = false
+    settingsStore
+      .get()
+      .then((s) => {
+        if (!cancelled) setSeasonal(s.seasonalThemes !== false)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   // Each step moves focus to its heading, so a screen reader announces where you are.
   useEffect(() => {
     headingRef.current?.focus()
   }, [step])
 
-  const content = welcomeContent(now)
+  const content = welcomeContent(now, undefined, seasonal)
+  const art = useSeasonArt(content.art)
   const view: WelcomeView = catalog
     ? welcomeView(content, catalog)
     : { content, featured: undefined, covers: [] }
@@ -137,11 +155,24 @@ export default function OnboardingScreen() {
         </p>
       )}
 
+      {preview && (
+        <div
+          role="status"
+          className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-surface p-3"
+        >
+          <span>Preview of the welcome screen. Nothing is saved.</span>
+          <Link to="/settings" className={secondary}>
+            Back to Settings
+          </Link>
+        </div>
+      )}
+
       {step === 'welcome' && (
         <WelcomeHero
           view={view}
+          art={art}
           headingRef={headingRef}
-          busy={busy}
+          busy={busy || preview}
           onReadNow={readNow}
           onPickMoods={() => setStep('mood')}
         />
