@@ -24,6 +24,7 @@ import {
 import { useInstallOffer } from '../storage/useInstallOffer'
 import { useReadingSession } from './useReadingSession'
 import { UndoToast } from '../ui/UndoToast'
+import { swipeDirection } from './swipe'
 import { AaPanel } from './AaPanel'
 import { EndScreen } from './EndScreen'
 import { ProgressBar } from './ProgressBar'
@@ -73,6 +74,7 @@ function Reader({ id }: { id: string }) {
   const [panelOpen, setPanelOpen] = useState(false)
   const [barsVisible, setBarsVisible] = useState(true)
   const [errorText, setErrorText] = useState('')
+  const [hintSeen, setHintSeen] = useState(true)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const engineRef = useRef<ReaderEngine | null>(null)
@@ -110,6 +112,7 @@ function Reader({ id }: { id: string }) {
           theme: settings.theme,
         }
         setStyle(initialStyle)
+        setHintSeen(settings.readerHintSeen === true)
 
         const container = containerRef.current
         if (!container) throw new Error('the reading area is not ready')
@@ -182,12 +185,46 @@ function Reader({ id }: { id: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dark])
 
-  const turn = useCallback((direction: 'next' | 'prev') => {
-    if (phaseRef.current !== 'ready') return
-    void (direction === 'next'
-      ? engineRef.current?.next()
-      : engineRef.current?.prev())
+  const dismissHint = useCallback(() => {
+    setHintSeen((seen) => {
+      if (!seen) void settingsStore.update({ readerHintSeen: true })
+      return true
+    })
   }, [])
+
+  const turn = useCallback(
+    (direction: 'next' | 'prev') => {
+      if (phaseRef.current !== 'ready') return
+      dismissHint()
+      void (direction === 'next'
+        ? engineRef.current?.next()
+        : engineRef.current?.prev())
+    },
+    [dismissHint],
+  )
+
+  // A swipe sideways turns the page: left for next, right for previous. Taps still go to the buttons.
+  const gestureRef = useRef<{ x: number; y: number; t: number } | null>(null)
+  const onPointerDown = (e: React.PointerEvent): void => {
+    gestureRef.current =
+      e.pointerType === 'mouse'
+        ? null
+        : { x: e.clientX, y: e.clientY, t: e.timeStamp }
+  }
+  const onPointerUp = (e: React.PointerEvent): void => {
+    const start = gestureRef.current
+    gestureRef.current = null
+    if (!start || panelRef.current) return
+    const direction = swipeDirection({
+      startX: start.x,
+      startY: start.y,
+      endX: e.clientX,
+      endY: e.clientY,
+      ms: e.timeStamp - start.t,
+      screenWidth: window.innerWidth,
+    })
+    if (direction) turn(direction)
+  }
 
   // Arrow keys, Page Up/Down and Space turn pages.
   useEffect(() => {
@@ -236,6 +273,9 @@ function Reader({ id }: { id: string }) {
       data-locator={location?.locator ?? ''}
       className="fixed inset-0 overflow-hidden"
       style={{ background: colors.background, color: colors.text }}
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
+      onPointerCancel={() => (gestureRef.current = null)}
     >
       <div ref={containerRef} className="absolute inset-x-0 top-0 bottom-10" />
 
@@ -246,23 +286,43 @@ function Reader({ id }: { id: string }) {
             tabIndex={-1}
             aria-label="Previous page"
             onClick={() => turn('prev')}
-            className="absolute top-0 bottom-10 left-0 w-[30%] cursor-default"
+            className="absolute top-0 bottom-10 left-0 w-[30%] cursor-default touch-pan-y"
           />
           <button
             type="button"
             tabIndex={-1}
             aria-label="Show or hide controls"
             onClick={() => setBarsVisible((v) => !v)}
-            className="absolute top-0 bottom-10 left-[30%] w-[40%] cursor-default"
+            className="absolute top-0 bottom-10 left-[30%] w-[40%] cursor-default touch-pan-y"
           />
           <button
             type="button"
             tabIndex={-1}
             aria-label="Next page"
             onClick={() => turn('next')}
-            className="absolute top-0 right-0 bottom-10 w-[30%] cursor-default"
+            className="absolute top-0 right-0 bottom-10 w-[30%] cursor-default touch-pan-y"
           />
         </>
+      )}
+
+      {phase === 'ready' && !hintSeen && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-14 z-30 flex justify-center px-4">
+          <div
+            role="note"
+            data-testid="reader-hint"
+            className="pointer-events-auto flex max-w-sm items-center gap-3 rounded-xl border border-current/30 px-4 py-3 text-sm shadow-lg"
+            style={{ background: colors.background }}
+          >
+            <p>Tap the edges or swipe to turn pages.</p>
+            <button
+              type="button"
+              onClick={dismissHint}
+              className="inline-flex min-h-11 shrink-0 items-center rounded-lg border border-current/40 px-3 font-semibold"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
       )}
 
       {barsVisible && phase !== 'finished' && (

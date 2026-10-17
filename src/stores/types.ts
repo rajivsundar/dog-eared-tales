@@ -112,6 +112,8 @@ export interface Settings {
   persistence?: { requested: boolean; granted: boolean }
   /** The install offer on the end screen is shown once. */
   installOffered?: boolean
+  /** The first-time "Tap the edges or swipe to turn pages" hint in the reader was seen. */
+  readerHintSeen?: boolean
   /** The "Tune your picks" card on Your Shortlist was dismissed. */
   tuneDismissed?: boolean
   /** Seasonal themes (welcome art, subtitle, Tales for Longer Nights). On unless set to false. */

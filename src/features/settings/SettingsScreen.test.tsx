@@ -137,6 +137,15 @@ describe('About', () => {
   })
 })
 
+describe('About: turning pages', () => {
+  it('tells readers how to turn pages', async () => {
+    renderSettings()
+    expect(
+      await screen.findByText('Tap the edges or swipe to turn pages.'),
+    ).toBeInTheDocument()
+  })
+})
+
 describe('Seasonal themes', () => {
   it('is on by default, can be turned off, and is remembered for this profile', async () => {
     renderSettings()

@@ -184,6 +184,7 @@ export function SettingsScreen() {
         <p className="mt-2 text-muted">
           Some descriptions are written by AI and not yet checked by a person.
         </p>
+        <p className="mt-2 text-muted">Tap the edges or swipe to turn pages.</p>
         <p className="mt-4 text-muted">
           Redo onboarding to pick your moods and taste cards again. Your reading
           history stays as it is.
