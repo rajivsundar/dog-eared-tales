@@ -12,6 +12,12 @@ describe('readingLevelLabel', () => {
     )
   })
 
+  it('shows only the band when it was set by hand', () => {
+    expect(
+      readingLevelLabel({ grade: 6, band: 'medium', adjusted: true }),
+    ).toBe('Medium')
+  })
+
   it('caps the grade at 12', () => {
     expect(readingLevelLabel({ grade: 13, band: 'challenging' })).toBe(
       'Challenging (grade 12+)',

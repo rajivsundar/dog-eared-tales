@@ -15,7 +15,7 @@ export interface CatalogEntry {
   wordCount: number
   readingMinutes: number
   lengthClass: LengthClass
-  readingLevel: { grade: number; band: ReadingBand }
+  readingLevel: { grade: number; band: ReadingBand; adjusted?: boolean }
   firstLine: string
   /** Where the EPUB is served from, for example /texts/pg-1661.epub. */
   textUrl: string

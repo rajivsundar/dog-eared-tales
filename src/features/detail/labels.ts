@@ -20,6 +20,8 @@ const BAND_LABELS = {
 const MAX_GRADE_SHOWN = 12
 
 export function readingLevelLabel(level: CatalogEntry['readingLevel']): string {
+  // A band set by hand has no honest grade to show.
+  if (level.adjusted) return BAND_LABELS[level.band]
   // Grades above 12 are shown as 12+. The catalog keeps the raw value.
   const grade =
     level.grade > MAX_GRADE_SHOWN ? `${MAX_GRADE_SHOWN}+` : level.grade

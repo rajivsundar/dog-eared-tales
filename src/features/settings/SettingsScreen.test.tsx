@@ -126,6 +126,17 @@ describe('About', () => {
   })
 })
 
+describe('About', () => {
+  it('says some descriptions are written by AI and not yet checked by a person', async () => {
+    renderSettings()
+    expect(
+      await screen.findByText(
+        'Some descriptions are written by AI and not yet checked by a person.',
+      ),
+    ).toBeInTheDocument()
+  })
+})
+
 describe('Seasonal themes', () => {
   it('is on by default, can be turned off, and is remembered for this profile', async () => {
     renderSettings()

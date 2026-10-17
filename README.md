@@ -4,7 +4,7 @@
 
 Twice Told is a free reading app that recommends public-domain short stories, essays and novellas, and learns your taste from how you react and what you finish. It runs entirely in your browser, works offline, and installs to your home screen.
 
-> Named after Nathaniel Hawthorne's *Twice-Told Tales* (1837) — stories worth telling again.
+> Named after Nathaniel Hawthorne's _Twice-Told Tales_ (1837) — stories worth telling again.
 
 ## What it does
 
@@ -20,15 +20,15 @@ Your reading data stays on your device. There are no accounts, no server databas
 
 ## Tech stack
 
-| Area | Choice |
-| --- | --- |
-| App | Vite + React + TypeScript |
-| Styling | Tailwind CSS with design tokens |
-| Storage | Dexie (IndexedDB), on-device only |
-| Reader | foliate-js behind a `ReaderEngine` adapter |
-| Offline / install | vite-plugin-pwa (Workbox) |
-| Tests | Vitest, Playwright, axe-core |
-| Hosting | Cloudflare Workers static assets, deployed by GitHub Actions |
+| Area              | Choice                                                       |
+| ----------------- | ------------------------------------------------------------ |
+| App               | Vite + React + TypeScript                                    |
+| Styling           | Tailwind CSS with design tokens                              |
+| Storage           | Dexie (IndexedDB), on-device only                            |
+| Reader            | foliate-js behind a `ReaderEngine` adapter                   |
+| Offline / install | vite-plugin-pwa (Workbox)                                    |
+| Tests             | Vitest, Playwright, axe-core                                 |
+| Hosting           | Cloudflare Workers static assets, deployed by GitHub Actions |
 
 ## Getting started
 
@@ -41,16 +41,16 @@ npm run dev       # start at http://localhost:5173
 
 `npm run dev` and `npm run build` first run `npm run catalog`, which rebuilds `public/catalog/`, `public/texts/` and `public/covers/` from `content/`. Those folders are generated and not committed.
 
-| Script | What it does |
-| --- | --- |
-| `npm run dev` | Start the app locally |
-| `npm run build` | Build the static site into `dist/` |
-| `npm run preview` | Serve the built site locally |
-| `npm run catalog` | Build `public/catalog/catalog.json`, texts and covers from `content/` |
-| `npm test` | Unit tests (Vitest) |
-| `npm run e2e` | End-to-end tests (Playwright) |
-| `npm run lint` / `npm run typecheck` | Code checks |
-| `npm run deploy` | Build and deploy to Cloudflare |
+| Script                               | What it does                                                          |
+| ------------------------------------ | --------------------------------------------------------------------- |
+| `npm run dev`                        | Start the app locally                                                 |
+| `npm run build`                      | Build the static site into `dist/`                                    |
+| `npm run preview`                    | Serve the built site locally                                          |
+| `npm run catalog`                    | Build `public/catalog/catalog.json`, texts and covers from `content/` |
+| `npm test`                           | Unit tests (Vitest)                                                   |
+| `npm run e2e`                        | End-to-end tests (Playwright)                                         |
+| `npm run lint` / `npm run typecheck` | Code checks                                                           |
+| `npm run deploy`                     | Build and deploy to Cloudflare                                        |
 
 ## Project structure
 

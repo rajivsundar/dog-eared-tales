@@ -15,6 +15,7 @@ import {
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { strFromU8, unzipSync } from 'fflate'
+import { automatedCheckProblems } from './curationChecks.ts'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const RAW_DIR = path.join(ROOT, 'content', 'raw')
@@ -92,12 +93,15 @@ export type Mood = (typeof MOODS)[number]
 export type ContentNote = (typeof CONTENT_NOTES)[number]
 export type EraBand = (typeof ERA_BANDS)[number]
 export type Form = (typeof FORMS)[number]
+export type Review = 'human' | 'auto'
 export type ReadingBand = 'easy' | 'medium' | 'challenging'
 
 export interface ReadingLevel {
   /** Flesch-Kincaid grade of the story's own text, rounded to a whole number. */
   grade: number
   band: ReadingBand
+  /** True when curation.json sets the band by hand because the computed grade misjudges the prose. */
+  adjusted?: boolean
 }
 
 /** What content/curation.json holds for each entry. */
@@ -114,6 +118,8 @@ export interface Curation {
   blurb: string
   generatedBy: string
   reviewed: boolean
+  /** Who has read the description: a person ("human") or only the automated checks ("auto"). */
+  review: Review
 }
 
 export interface CatalogEntry extends Curation {
@@ -150,11 +156,16 @@ export interface CatalogEntry extends Curation {
 export type BaseEntry = Omit<CatalogEntry, keyof Curation>
 
 export interface BuildResult {
-  /** The entries that ship: those with a curation record marked reviewed: true. */
+  /**
+   * The entries that ship: records with review "human" and reviewed: true, and records with
+   * review "auto" that pass every automated check.
+   */
   entries: CatalogEntry[]
+  /** AI-written records held back because they failed an automated check, with the reasons. */
+  heldBack: { id: string; reasons: string[] }[]
   /** Every row of sources.csv, built and checked, whether or not it ships. */
   base: BaseEntry[]
-  /** Rows held back because they have no reviewed curation record yet. */
+  /** Rows that do not ship: no curation record, not yet reviewed by a person, or held back. */
   skipped: BaseEntry[]
   /** The text range of every entry (by id), for tests. */
   rangeText: Record<string, string>
@@ -782,6 +793,8 @@ function pickText(
   return value
 }
 
+const READING_BANDS: readonly ReadingBand[] = ['easy', 'medium', 'challenging']
+
 /**
  * Adds each entry's curation record. An entry with no record is left out (it is not ready to ship
  * yet). Stops if a record is invalid, or belongs to no catalog entry.
@@ -830,10 +843,36 @@ export function mergeCuration(
       fail(`${where}: generatedBy is missing`)
     if (typeof r.reviewed !== 'boolean')
       fail(`${where}: reviewed must be true or false`)
+    if (r.review !== 'human' && r.review !== 'auto')
+      fail(`${where}: review must be "human" or "auto"`)
+
+    // The computed reading level can clearly misjudge the prose. A record may then set the band by
+    // hand, and must say why. Use sparingly (docs/DECISIONS.md).
+    const override = r.readingLevelOverride
+    const reason = r.overrideReason
+    let readingLevel = entry.readingLevel
+    if (override !== undefined || reason !== undefined) {
+      if (!(READING_BANDS as readonly unknown[]).includes(override))
+        fail(
+          `${where}: readingLevelOverride must be "easy", "medium" or "challenging"`,
+        )
+      if (typeof reason !== 'string' || reason.trim() === '')
+        fail(`${where}: readingLevelOverride needs an overrideReason`)
+      if (override === entry.readingLevel.band)
+        fail(
+          `${where}: readingLevelOverride is the computed band already (${entry.readingLevel.band}); remove it`,
+        )
+      readingLevel = {
+        grade: entry.readingLevel.grade,
+        band: override as ReadingBand,
+        adjusted: true,
+      }
+    }
 
     return [
       {
         ...entry,
+        readingLevel,
         year,
         eraBand: eraBand as EraBand,
         form: form as Form,
@@ -851,6 +890,7 @@ export function mergeCuration(
         blurb: pickText(where, 'blurb', r.blurb, 60),
         generatedBy: r.generatedBy,
         reviewed: r.reviewed,
+        review: r.review,
       },
     ]
   })
@@ -859,6 +899,29 @@ export function mergeCuration(
 // ---------------------------------------------------------------- build
 
 const REQUIRED_CSV = ['file', 'story_title', 'source', 'source_url']
+
+/**
+ * Which curated records ship. A record reviewed by a person (review "human") ships once it is
+ * marked reviewed: true. An AI-written record (review "auto") ships if it passes every automated
+ * check; if it fails one it is held back, and the reasons are returned so the build can list them.
+ */
+export function decideShipping(
+  records: CatalogEntry[],
+  rangeText: Record<string, string>,
+): { shipped: CatalogEntry[]; heldBack: { id: string; reasons: string[] }[] } {
+  const shipped: CatalogEntry[] = []
+  const heldBack: { id: string; reasons: string[] }[] = []
+  for (const record of records) {
+    if (record.review === 'human') {
+      if (record.reviewed) shipped.push(record)
+      continue
+    }
+    const reasons = automatedCheckProblems(record, rangeText[record.id] ?? '')
+    if (reasons.length === 0) shipped.push(record)
+    else heldBack.push({ id: record.id, reasons })
+  }
+  return { shipped, heldBack }
+}
 
 export function buildCatalog(): BuildResult {
   if (!existsSync(SOURCES_CSV)) fail('content/sources.csv not found')
@@ -914,12 +977,12 @@ export function buildCatalog(): BuildResult {
 
     const csvStart = row.story_href || null
     const csvEnd = row.story_end_href || null
-    if ((csvStart === null) !== (csvEnd === null)) {
-      fail(
-        `${where}: story_href and story_end_href must both be filled or both be blank`,
-      )
+    // story_href alone moves the start of a single work past front matter (a foreword, say);
+    // both together mark a story inside a collection.
+    if (csvEnd !== null && csvStart === null) {
+      fail(`${where}: story_end_href needs a story_href`)
     }
-    const isCollection = csvStart !== null
+    const isCollection = csvStart !== null && csvEnd !== null
     // A single work starts at its own title and ends where the licence section begins.
     const startHref = csvStart ?? findWorkStart(epub, row.story_title, where)
     const endHref = csvEnd ?? epub.licenseHref
@@ -980,7 +1043,10 @@ export function buildCatalog(): BuildResult {
     if (f.endsWith('.epub') && !used.has(f))
       console.warn(`catalog: ${f} is in content/raw/ but not in sources.csv`)
   }
-  const entries = mergeCuration(base, loadCuration()).filter((e) => e.reviewed)
+  const { shipped: entries, heldBack } = decideShipping(
+    mergeCuration(base, loadCuration()),
+    rangeText,
+  )
   const shipped = new Set(entries.map((e) => e.id))
   const skipped = base.filter((e) => !shipped.has(e.id))
   // Only the books of entries that ship are published.
@@ -990,7 +1056,7 @@ export function buildCatalog(): BuildResult {
   const shippedEpubs = new Map(
     [...epubs].filter(([number]) => shippedNumbers.has(number)),
   )
-  return { entries, base, skipped, rangeText, epubs: shippedEpubs }
+  return { entries, heldBack, base, skipped, rangeText, epubs: shippedEpubs }
 }
 
 function writeOutputs({ entries, epubs }: BuildResult): void {
@@ -1060,11 +1126,14 @@ function main(): void {
     writeOutputs(result)
     mkdirSync(path.dirname(CACHE_FILE), { recursive: true })
     writeFileSync(CACHE_FILE, key)
+    for (const h of result.heldBack) {
+      console.warn(`catalog: HELD BACK ${h.id}: ${h.reasons.join('; ')}`)
+    }
     const held = result.skipped.length
     console.log(
       `catalog: ${result.entries.length} entries from ${result.epubs.size} EPUBs -> public/catalog/catalog.json` +
         (held > 0
-          ? ` (${held} more in sources.csv are not shipped yet: no reviewed curation record)`
+          ? ` (${held} more in sources.csv are not shipped yet: no curation record, not yet reviewed, or held back)`
           : ''),
     )
   } catch (error) {

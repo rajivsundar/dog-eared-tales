@@ -103,20 +103,30 @@ beforeAll(() => {
 }, 60_000)
 
 /** The curation records in content/curation.json, by entry id. */
-function curationRecords(): Record<string, { reviewed?: boolean }> {
+function curationRecords(): Record<
+  string,
+  { reviewed?: boolean; review?: string }
+> {
   const file = JSON.parse(
     readFileSync(new URL('../content/curation.json', import.meta.url), 'utf8'),
-  ) as { entries: Record<string, { reviewed?: boolean }> }
+  ) as {
+    entries: Record<string, { reviewed?: boolean; review?: string }>
+  }
   return file.entries
 }
 
 const EPUB_NUMBER = /^\/texts\/pg-(\d+)\.epub$/
 
 describe('which entries ship', () => {
-  it('ships exactly the sources.csv rows that have a reviewed curation record', () => {
+  it('ships the rows with a reviewed human record, or an auto record that was not held back', () => {
     const records = curationRecords()
+    const held = new Set(result.heldBack.map((h) => h.id))
     const expected = result.base
-      .filter((b) => records[b.id]?.reviewed === true)
+      .filter((b) => {
+        const r = records[b.id]
+        if (!r) return false
+        return r.review === 'auto' ? !held.has(b.id) : r.reviewed === true
+      })
       .map((b) => b.id)
       .sort()
     expect(result.entries.map((e) => e.id).sort()).toEqual(expected)
@@ -417,6 +427,7 @@ const CURATION_KEYS = [
   'blurb',
   'generatedBy',
   'reviewed',
+  'review',
 ] as const
 
 function splitEntry(entry: CatalogEntry): {
@@ -595,16 +606,20 @@ describe('reading level', () => {
     expect(readingLevelFor(dense).band).toBe('challenging')
   })
 
-  it('gives every entry a grade and band that agree', () => {
+  it('gives every entry a grade and band that agree, unless the band was set by hand', () => {
     for (const e of result.entries) {
       expect(e.readingLevel.grade, e.id).toBeGreaterThanOrEqual(0)
       expect(Number.isInteger(e.readingLevel.grade), e.id).toBe(true)
-      expect(e.readingLevel.band, e.id).toBe(
-        readingBandFor(e.readingLevel.grade),
-      )
-      expect(readingLevelFor(result.rangeText[e.id]), e.id).toEqual(
-        e.readingLevel,
-      )
+      const computed = readingLevelFor(result.rangeText[e.id])
+      expect(e.readingLevel.grade, e.id).toBe(computed.grade)
+      if (e.readingLevel.adjusted) {
+        expect(e.readingLevel.band, e.id).not.toBe(computed.band)
+      } else {
+        expect(e.readingLevel, e.id).toEqual(computed)
+        expect(e.readingLevel.band, e.id).toBe(
+          readingBandFor(e.readingLevel.grade),
+        )
+      }
     }
   })
 })
