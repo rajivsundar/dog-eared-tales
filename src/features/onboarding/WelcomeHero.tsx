@@ -1,6 +1,7 @@
 import { useId, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import type { SeasonArt } from '../../app/seasonArt/types'
+import { SleepingDog } from '../../app/welcomeArt/SleepingDog'
 import type { WelcomeView } from './featuredStory'
 import { minutesLabel } from '../detail/labels'
 import { FIRST_RUN_MOODS } from './moods'
@@ -14,7 +15,7 @@ interface Props {
   onReadNow: () => void
   /** One tap on a mood builds the first Your Shortlist. */
   onPickMood: (id: string) => void
-  /** The season's drawings, once loaded. Nothing is drawn without a season. */
+  /** The season's drawings, once loaded: the falling leaves. Nothing is drawn without a season. */
   art?: SeasonArt | null
 }
 
@@ -28,7 +29,7 @@ const FAN = [
   { rotate: '9deg', shift: '-1.25rem', z: 2 },
 ]
 
-/** The first-run welcome: a fan of three covers, the headline, two buttons and the trust line. */
+/** The first-run welcome: a fan of three covers, the sleeping dog, the headline, the moods and the trust line. */
 export function WelcomeHero({
   view,
   headingRef,
@@ -70,11 +71,10 @@ export function WelcomeHero({
             />
           ))}
         </div>
-        {art && (
-          <div className="-mt-4 w-44 sm:w-56 lg:w-64">
-            <art.Scene />
-          </div>
-        )}
+        {/* The sleeping dog, all year. Only the season's leaves change. */}
+        <div className="-mt-2 w-56 sm:w-72 lg:w-80">
+          <SleepingDog />
+        </div>
       </div>
 
       {/* Text */}

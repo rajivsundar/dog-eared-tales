@@ -472,26 +472,26 @@ describe('Redo onboarding (the full flow)', () => {
 })
 
 describe('the fall artwork on the welcome page', () => {
-  it('draws the reading chair and falling leaves in fall', async () => {
+  it('draws the sleeping dog and the falling leaves in fall, but not the reading chair', async () => {
     setDate(2026, 10, 16)
     await welcome()
-    expect(await screen.findByTestId('season-scene')).toBeInTheDocument()
-    expect(screen.getByTestId('season-leaves')).toBeInTheDocument()
-    // Decorative: hidden from screen readers.
-    expect(screen.getByTestId('season-scene')).toHaveAttribute(
+    expect(await screen.findByTestId('season-leaves')).toBeInTheDocument()
+    expect(screen.getByTestId('welcome-dog')).toBeInTheDocument()
+    expect(screen.queryByTestId('season-scene')).toBeNull()
+  })
+
+  it('draws the sleeping dog all year, decorative and hidden from screen readers', async () => {
+    setDate(2026, 12, 1)
+    await welcome()
+    expect(screen.getByTestId('welcome-dog')).toHaveAttribute(
       'aria-hidden',
       'true',
     )
-  })
-
-  it('draws nothing out of season', async () => {
-    setDate(2026, 12, 1)
-    await welcome()
     expect(screen.queryByTestId('season-scene')).toBeNull()
     expect(screen.queryByTestId('season-leaves')).toBeNull()
   })
 
-  it('draws nothing, and uses the defaults, when seasonal themes are off', async () => {
+  it('draws no leaves, and uses the defaults, when seasonal themes are off', async () => {
     setDate(2026, 10, 16)
     await stores.settingsStore.update({ seasonalThemes: false })
     renderOnboarding()
@@ -500,6 +500,7 @@ describe('the fall artwork on the welcome page', () => {
       'Free classics, picked for you.',
     )
     expect(screen.getByRole('button', { name: 'Surprise me' })).toBeEnabled()
+    expect(screen.getByTestId('welcome-dog')).toBeInTheDocument()
     expect(screen.queryByTestId('season-scene')).toBeNull()
     expect(screen.queryByTestId('season-leaves')).toBeNull()
   })
