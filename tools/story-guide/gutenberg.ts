@@ -3,18 +3,21 @@
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { stripIllustrationPlaceholders } from '../../scripts/build-catalog.ts'
+import {
+  CatalogUnavailable,
+  type CatalogIndex,
+  loadCatalog,
+  searchIndex,
+} from './catalog.ts'
+import { GutenbergError, USER_AGENT, type Fetch } from './common.ts'
 
-export const GUTENDEX = 'https://gutendex.com/books'
-export const USER_AGENT =
-  'DogEaredTalesStoryGuide/1.0 (local hackathon tool; https://github.com/rajivsundar/dog-eared-tales)'
+export { GutenbergError, USER_AGENT }
+
+// Gutendex is only a fallback now: the local catalog file is searched first.
+export const GUTENDEX = 'https://gutendex.com/books/'
 /** The most words the full-story call reads. */
 export const MAX_ANALYSED_WORDS = 20_000
 export const MAX_RESULTS = 10
-
-/** A friendly failure: the message is safe to show on the page. */
-export class GutenbergError extends Error {}
-
-type Fetch = typeof fetch
 
 export interface GutenbergResult {
   id: number
@@ -76,7 +79,7 @@ async function getJson(url: string, fetchFn: Fetch): Promise<unknown> {
   try {
     response = await fetchFn(url, {
       headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
-      signal: AbortSignal.timeout(20_000),
+      signal: AbortSignal.timeout(15_000),
     })
   } catch {
     throw new GutenbergError(DOWN)
@@ -112,14 +115,51 @@ export async function searchGutendex(
 
 const CACHE = new URL('./cache/', import.meta.url)
 
+/** Where Project Gutenberg keeps a book's UTF-8 plain text. */
+export const gutenbergTextUrl = (id: number): string =>
+  `https://www.gutenberg.org/cache/epub/${id}/pg${id}.txt`
+
 /**
- * One book by its Gutenberg id. The client only ever sends the id, never a link. Kept in
- * cache/<id>.json, so a book already picked works even when Gutendex is down.
+ * Searches Project Gutenberg's official catalog file on this computer (title and author, English
+ * only, forgiving of small misspellings). Only if that file cannot be downloaded and there is no
+ * copy is Gutendex tried instead.
+ */
+export async function searchGutenberg(
+  query: string,
+  fetchFn: Fetch = fetch,
+  catalog: () => Promise<CatalogIndex> = () => loadCatalog(fetchFn),
+): Promise<GutenbergResult[]> {
+  try {
+    return searchIndex(await catalog(), query, MAX_RESULTS).map((hit) => ({
+      ...hit,
+      downloads: 0,
+    }))
+  } catch (error) {
+    if (!(error instanceof CatalogUnavailable)) throw error
+    console.error(
+      `story-guide: the Gutenberg catalog file is not available (${error.message}); trying Gutendex`,
+    )
+  }
+  try {
+    return await searchGutendex(query, fetchFn)
+  } catch {
+    throw new GutenbergError(
+      "Could not get Project Gutenberg's catalog file, and the Gutendex fallback is not answering either. Check your internet connection and try again in a minute, or pick a catalog story or paste text instead.",
+    )
+  }
+}
+
+/**
+ * One book by its Gutenberg id. The client only ever sends the id, never a link. The details come
+ * from the local catalog file (the text link is Gutenberg's standard one); only for a book not in
+ * it, or with no catalog file, is Gutendex asked. Kept in cache/<id>.json, so a book already
+ * picked needs neither.
  */
 export async function findBook(
   id: number,
   fetchFn: Fetch = fetch,
   cacheDir: URL = CACHE,
+  catalog: () => Promise<CatalogIndex> = () => loadCatalog(fetchFn),
 ): Promise<GutenbergBook> {
   const file = new URL(`${id}.json`, cacheDir)
   try {
@@ -132,12 +172,29 @@ export async function findBook(
   } catch {
     // Not cached yet.
   }
-  const raw = (await getJson(`${GUTENDEX}/${id}`, fetchFn)) as RawBook
-  const book = toBook(raw)
-  if (!book)
-    throw new GutenbergError('Gutendex sent back something unexpected.')
-  if (!book.textUrl)
-    throw new GutenbergError('This book has no plain-text file on Gutenberg.')
+
+  let book: GutenbergBook | null = null
+  try {
+    const row = (await catalog()).byId.get(id)
+    if (row)
+      book = {
+        id,
+        title: row.title,
+        author: row.author,
+        downloads: 0,
+        textUrl: gutenbergTextUrl(id),
+      }
+  } catch (error) {
+    if (!(error instanceof CatalogUnavailable)) throw error
+  }
+  if (!book) {
+    const raw = (await getJson(`${GUTENDEX}${id}/`, fetchFn)) as RawBook
+    book = toBook(raw)
+    if (!book)
+      throw new GutenbergError('Gutendex sent back something unexpected.')
+    if (!book.textUrl)
+      throw new GutenbergError('This book has no plain-text file on Gutenberg.')
+  }
   await mkdir(cacheDir, { recursive: true })
   await writeFile(
     file,

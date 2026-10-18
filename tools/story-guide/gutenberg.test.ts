@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { CatalogUnavailable } from './catalog.ts'
 import {
   GutenbergError,
   USER_AGENT,
@@ -125,6 +126,10 @@ describe('searchGutendex', () => {
   })
 })
 
+const noCatalog = async () => {
+  throw new CatalogUnavailable('no catalog in this test')
+}
+
 describe('the cache', () => {
   let dir: URL
   beforeEach(async () => {
@@ -180,10 +185,12 @@ describe('the cache', () => {
         formats: { 'text/plain; charset=utf-8': book.textUrl },
       }),
     )
-    const first = await findBook(84, up as typeof fetch, dir)
+    const first = await findBook(84, up as typeof fetch, dir, noCatalog)
     expect(first.author).toBe('Mary Shelley')
     const down = vi.fn(async () => json({}, 503))
-    expect(await findBook(84, down as typeof fetch, dir)).toEqual(first)
+    expect(await findBook(84, down as typeof fetch, dir, noCatalog)).toEqual(
+      first,
+    )
     expect(down).not.toHaveBeenCalled()
   })
 })

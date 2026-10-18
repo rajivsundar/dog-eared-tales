@@ -577,9 +577,9 @@
                     b.author +
                     ' · #' +
                     b.id +
-                    ' · ' +
-                    b.downloads.toLocaleString() +
-                    ' downloads',
+                    (b.downloads
+                      ? ' · ' + b.downloads.toLocaleString() + ' downloads'
+                      : ''),
                 }),
                 el('button', {
                   type: 'button',

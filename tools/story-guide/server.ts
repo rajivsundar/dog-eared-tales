@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url'
 import express from 'express'
 import { MOODS, buildCatalog } from '../../scripts/build-catalog.ts'
 import type { CatalogEntry } from '../../scripts/build-catalog.ts'
+import { loadCatalog } from './catalog.ts'
 import {
   GutenbergError,
   MAX_ANALYSED_WORDS,
@@ -17,7 +18,7 @@ import {
   findBook,
   gutenbergPage,
   loadBookText,
-  searchGutendex,
+  searchGutenberg,
   trimGutenbergText,
 } from './gutenberg.ts'
 import {
@@ -147,7 +148,7 @@ app.get('/api/gutenberg/search', async (req, res) => {
     return
   }
   try {
-    res.json(await searchGutendex(q))
+    res.json(await searchGutenberg(q))
   } catch (error) {
     sendGutenbergError(res, error)
   }
@@ -328,6 +329,19 @@ app.post('/analyze', async (req, res) => {
     res.status(502).json({ error: message })
   }
 })
+
+// Get Gutenberg's catalog file ready in the background (downloaded once, then refreshed weekly).
+void loadCatalog()
+  .then((index) =>
+    console.log(
+      `Project Gutenberg catalog ready: ${index.rows.length} English texts`,
+    ),
+  )
+  .catch((error: Error) =>
+    console.error(
+      `story-guide: Gutenberg catalog not ready (${error.message}); search will try Gutendex`,
+    ),
+  )
 
 // Only this computer can reach the tool.
 app.listen(PORT, '127.0.0.1', () => {
