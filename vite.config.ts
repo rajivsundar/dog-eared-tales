@@ -77,7 +77,11 @@ export default defineConfig({
           // needs no browser, so it runs in plain Node.
           name: 'unit',
           environment: 'node',
-          include: ['src/**/*.test.ts', 'scripts/**/*.test.ts'],
+          include: [
+            'src/**/*.test.ts',
+            'scripts/**/*.test.ts',
+            'tools/**/*.test.ts',
+          ],
         },
       },
       {

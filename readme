@@ -75,6 +75,23 @@ src/
 - **Libraries** keep their own licences: Dexie is Apache-2.0; foliate-js, React, React DOM, React Router, Tailwind CSS and vite-plugin-pwa (Workbox) are MIT. Other build and test tools are listed in `package.json` with their own licences.
 - Dog-Eared Tales is frozen at the Twice Told v1.0 tag; see `docs/DECISIONS.md`.
 
+## Story Guide (hackathon tool)
+
+Story Guide is a local tool in `tools/story-guide/` that never ships in the app. It uses **Gemma 4 via the Gemini API** to suggest descriptions and labels for a story, and shows them beside the curated ones.
+
+- **Hook and blurb:** Gemma sees only the first third of the story, so it sets up the premise without hinting at the turn or ending (hook 20 words or fewer, blurb 60 or fewer). The page says so: "Gemma wrote this blurb without seeing the ending."
+- **Labels:** from the whole story, up to 3 moods (only from the catalog's mood list), content notes with intensity (none, mild or strong) for violence, death, frightening scenes, sexual themes, period racist language and animal harm, and an age band (All ages, 10+, 13+ or 16+) with a one-sentence reason for parents.
+- **Checks:** the catalog's own banned-words and six-word-quote checks run on Gemma's hook and blurb, and any failure is shown.
+- **Story source:** any catalog story (its text comes from the same extraction as the catalog build, so ranges and trims match what readers get), or pasted text of at least 150 words.
+
+To run it:
+
+1. Get a Gemini API key at <https://aistudio.google.com/apikey>.
+2. Copy `tools/story-guide/.env.example` to `tools/story-guide/.env` and fill in `GEMINI_API_KEY` and `GEMMA_MODEL` (`gemma-4-31b-it` or `gemma-4-26b-a4b-it`). The `.env` file is git-ignored; the key stays in the local server and never reaches the browser.
+3. Run `npm run story-guide` and open <http://localhost:5180/>. Without a key the page shows a message instead of failing.
+
+Very long books may be too big for the model to read in one go. Gemma's suggestions are drafts for a person to check, not published text. The tool is released under the same MIT licence as the rest of the code (see [LICENSE](LICENSE)); it uses Express (MIT) and the Gemini API, and Gemma is used under Google's Gemma terms.
+
 ## Deployment
 
 Every push to `main` runs the checks and deploys to Cloudflare Workers via GitHub Actions, using the repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
