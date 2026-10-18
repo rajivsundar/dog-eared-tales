@@ -92,8 +92,8 @@ describe('outside every season', () => {
     for (const date of [on(1, 15), on(3, 3), on(7, 4), on(9, 30), on(12, 25)]) {
       expect(activeSeason(date), date.toDateString()).toBeUndefined()
       expect(welcomeContent(date)).toEqual({
-        headline: 'Great free stories, picked for you.',
-        subline: 'Start short. Fall for the classics.',
+        headline: 'Free classics, picked for you.',
+        subline: 'Start short. Fold down a corner when one gets you.',
         primaryButton: 'Read a short story now',
         featuredStoryId: 'pg-269-the-open-window',
         coverIds: [

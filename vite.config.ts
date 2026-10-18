@@ -17,10 +17,10 @@ export default defineConfig({
       registerType: 'prompt',
       injectRegister: false,
       manifest: {
-        name: 'Twice Told',
-        short_name: 'Twice Told',
+        name: 'Dog-Eared Tales',
+        short_name: 'Dog-Eared Tales',
         description:
-          'Great free stories, picked for you. Start short. Fall for the classics.',
+          'Free classics, picked for you. Start short. Fold down a corner when one gets you.',
         start_url: '/',
         scope: '/',
         display: 'standalone',
@@ -57,7 +57,7 @@ export default defineConfig({
               url.pathname.endsWith('.epub'),
             handler: 'CacheFirst',
             options: {
-              cacheName: 'twice-told-texts',
+              cacheName: 'dog-eared-tales-texts',
               cacheableResponse: { statuses: [200] },
             },
           },

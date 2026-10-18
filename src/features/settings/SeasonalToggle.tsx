@@ -39,7 +39,8 @@ export function SeasonalToggle() {
       </h2>
       <p className="mt-2 text-muted">
         Artwork, a seasonal row of stories and a seasonal welcome while a season
-        is on, like fall. Turn them off to see the usual Twice Told all year.
+        is on, like fall. Turn them off to see the usual Dog-Eared Tales all
+        year.
       </p>
       <label className="mt-3 flex min-h-11 cursor-pointer items-center gap-3">
         <input

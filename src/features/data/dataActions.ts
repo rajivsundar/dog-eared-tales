@@ -12,18 +12,18 @@ const dateOf = (now: Date): string => {
   return `${now.getFullYear()}-${month}-${day}`
 }
 
-/** "twice-told-backup-2026-10-16.json", using the local date. With a profile name: "…-backup-sam-2026-10-16.json". */
+/** "dog-eared-tales-backup-2026-10-16.json", using the local date. With a profile name: "…-backup-sam-2026-10-16.json". */
 export function backupFileName(now: Date = new Date(), label?: string): string {
   const slug = (label ?? '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
-  return `twice-told-backup-${slug ? `${slug}-` : ''}${dateOf(now)}.json`
+  return `dog-eared-tales-backup-${slug ? `${slug}-` : ''}${dateOf(now)}.json`
 }
 
-/** "twice-told-all-profiles-2026-10-16.json". */
+/** "dog-eared-tales-all-profiles-2026-10-16.json". */
 export function allProfilesFileName(now: Date = new Date()): string {
-  return `twice-told-all-profiles-${dateOf(now)}.json`
+  return `dog-eared-tales-all-profiles-${dateOf(now)}.json`
 }
 
 /** The open profile as one JSON file's text, and the name to save it under. */

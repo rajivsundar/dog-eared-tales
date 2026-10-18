@@ -28,7 +28,7 @@ export function persistenceDeps(
 let running: Promise<void> | null = null
 
 /**
- * Asks the browser to protect Twice Told's data from automatic clearing (navigator.storage.persist()).
+ * Asks the browser to protect Dog-Eared Tales's data from automatic clearing (navigator.storage.persist()).
  * It does so once, and only after the reader's first Dog-ear or first finished work. The answer is
  * kept for the whole device, so later calls (and later visits) never ask again.
  */

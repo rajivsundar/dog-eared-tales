@@ -54,12 +54,14 @@ test.describe('the welcome page', () => {
     await page.clock.setFixedTime(MARCH)
     await page.goto('/')
     await expect(page).toHaveURL(/\/welcome$/)
-    await expect(page.getByText('Twice Told', { exact: true })).toBeVisible()
+    await expect(
+      page.getByText('Dog-Eared Tales', { exact: true }),
+    ).toBeVisible()
     const h1 = page.getByRole('heading', { level: 1 })
-    await expect(h1).toHaveText('Great free stories, picked for you.')
+    await expect(h1).toHaveText('Free classics, picked for you.')
     await expect(h1).toBeFocused()
     await expect(
-      page.getByText('Start short. Fall for the classics.'),
+      page.getByText('Start short. Fold down a corner when one gets you.'),
     ).toBeVisible()
     await expect(
       page.getByText(
@@ -85,11 +87,11 @@ test.describe('the welcome page', () => {
     )
   })
 
-  test('"Why Twice Told?" reveals the Hawthorne line', async ({ page }) => {
+  test('"Why Dog-Eared Tales?" reveals the About note', async ({ page }) => {
     await page.goto('/')
-    const line = page.getByText(/Named after Nathaniel Hawthorne/)
+    const line = page.getByText(/A dog-ear is the folded corner of a page/)
     await expect(line).toBeHidden()
-    const why = page.getByRole('button', { name: /Why .Twice Told.\?/ })
+    const why = page.getByRole('button', { name: /Why .Dog-Eared Tales.\?/ })
     await why.click()
     await expect(why).toHaveAttribute('aria-expanded', 'true')
     await expect(line).toBeVisible()
@@ -159,7 +161,7 @@ test.describe('the welcome page', () => {
     await page.clock.setFixedTime(DEC_1)
     await page.reload()
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(
-      'Great free stories, picked for you.',
+      'Free classics, picked for you.',
     )
     await expect(
       page.getByRole('button', { name: 'Read a short story now' }),
@@ -341,7 +343,9 @@ test('Redo onboarding in Settings runs the full flow and keeps reading history',
     .getByRole('link', { name: 'Settings' })
     .click()
   await expect(page.getByRole('heading', { name: 'About' })).toBeVisible()
-  await expect(page.getByText(/stories worth telling again/)).toBeVisible()
+  await expect(
+    page.getByText(/stories worth turning down a corner for/),
+  ).toBeVisible()
   await page.getByRole('link', { name: 'Redo onboarding' }).click()
   await expect(page).toHaveURL(/\/welcome\?redo=1$/)
 

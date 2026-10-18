@@ -69,11 +69,11 @@ describe('App', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
     renderAt('/')
     expect(
-      await screen.findByRole('heading', { name: 'Twice Told' }),
+      await screen.findByRole('heading', { name: 'Dog-Eared Tales' }),
     ).toBeInTheDocument()
     expect(
       await screen.findByText(
-        'Great free stories, picked for you. Start short. Fall for the classics.',
+        'Free classics, picked for you. Start short. Fold down a corner when one gets you.',
       ),
     ).toBeInTheDocument()
     await screen.findByRole('heading', { name: /Shortlist/ })

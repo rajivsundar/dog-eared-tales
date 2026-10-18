@@ -1,10 +1,10 @@
-# Twice Told
+# Dog-Eared Tales
 
-**Great free stories, picked for you. Start short. Fall for the classics.**
+**Free classics, picked for you. Start short. Fold down a corner when one gets you.**
 
-Twice Told is a free reading app that recommends public-domain short stories, essays and novellas, and learns your taste from how you react and what you finish. It runs entirely in your browser, works offline, and installs to your home screen.
+Dog-Eared Tales is a free reading app that recommends public-domain short stories, essays and novellas, and learns your taste from how you react and what you finish. It runs entirely in your browser, works offline, and installs to your home screen.
 
-> Named after Nathaniel Hawthorne's _Twice-Told Tales_ (1837) — stories worth telling again.
+> A dog-ear is the folded corner of a page, the mark of a book somebody loved. Dog-Eared Tales is a place for stories worth turning down a corner for.
 
 ## What it does
 
@@ -68,18 +68,19 @@ src/
   pwa/          Service worker and caching
 ```
 
-## Content and licenses
+## Content and licences
 
-- Texts come only from **Project Gutenberg** and **Standard Ebooks**, unchanged, with source and license recorded for every work.
-- Project Gutenberg files keep the Project Gutenberg License.
-- Standard Ebooks editions are dedicated to the public domain (CC0).
+- **Texts** are unchanged, with source and licence recorded for every work. They come from **Project Gutenberg** and **Standard Ebooks** and are in the **public domain in the United States**. Project Gutenberg files keep the Project Gutenberg License; Standard Ebooks editions are dedicated to the public domain (CC0).
 - The app never generates or paraphrases book text.
+- **Fonts** keep their own licences: Literata, Atkinson Hyperlegible and OpenDyslexic are under the SIL Open Font License 1.1 (via the `@fontsource` packages).
+- **Libraries** keep their own licences: Dexie is Apache-2.0; foliate-js, React, React DOM, React Router, Tailwind CSS and vite-plugin-pwa (Workbox) are MIT. Other build and test tools are listed in `package.json` with their own licences.
+- Dog-Eared Tales is frozen at the Twice Told v1.0 tag; see `docs/DECISIONS.md`.
 
 ## Deployment
 
 Every push to `main` runs the checks and deploys to Cloudflare Workers via GitHub Actions, using the repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
 
-Live site: <https://twice-told.rajivsundar.workers.dev>
+Live site: the Cloudflare Workers address of the `dog-eared-tales` Worker (add the exact link here after the first deploy).
 
 ## For contributors and AI assistants
 
@@ -87,6 +88,6 @@ Live site: <https://twice-told.rajivsundar.workers.dev>
 - `CONTEXT.md`: product name, tagline and glossary (UI labels and code terms)
 - `docs/SRS.md`: full requirements
 
-## License
+## Licence
 
-Code: All rights reserved. Book texts: see Content and licenses.
+The code is released under the MIT licence; see [LICENSE](LICENSE). Book texts and third-party fonts and libraries keep their own licences, as described in Content and licences.

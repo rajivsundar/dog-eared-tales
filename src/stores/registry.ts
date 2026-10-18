@@ -1,7 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie'
 import type { ReadingProfile } from './types'
 
-export const REGISTRY_NAME = 'twice-told-profiles'
+export const REGISTRY_NAME = 'dog-eared-tales-profiles'
 
 /** A small named value kept next to the profile list. */
 export interface MetaRecord {

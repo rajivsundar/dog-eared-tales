@@ -758,7 +758,7 @@ describe('the install offer and asking to protect the data', () => {
     const end = await finish()
     const offer = await within(end).findByTestId('install-offer')
     expect(
-      within(offer).getByRole('button', { name: 'Install Twice Told' }),
+      within(offer).getByRole('button', { name: 'Install Dog-Eared Tales' }),
     ).toBeInTheDocument()
     expect(h.settingsStore.update).toHaveBeenCalledWith({
       installOffered: true,

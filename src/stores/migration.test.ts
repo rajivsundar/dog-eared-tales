@@ -95,7 +95,7 @@ describe('migrating the old single database into a profile "Me"', () => {
     }
     const manager = newTestManager({ ...names, locks })
     await manager.ready()
-    expect(taken).toEqual(['twice-told-profiles'])
+    expect(taken).toEqual(['dog-eared-tales-profiles'])
     manager.close()
   })
 

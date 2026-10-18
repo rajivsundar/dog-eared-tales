@@ -26,9 +26,10 @@ export default function AllStoriesPage() {
 
   return (
     <main className="mx-auto max-w-xl px-4 py-12">
-      <h1 className="text-center text-4xl font-bold">Twice Told</h1>
+      <h1 className="text-center text-4xl font-bold">Dog-Eared Tales</h1>
       <p className="mt-3 text-center text-lg text-muted">
-        Great free stories, picked for you. Start short. Fall for the classics.
+        Free classics, picked for you. Start short. Fold down a corner when one
+        gets you.
       </p>
 
       <section aria-labelledby="all-stories" className="mt-10">

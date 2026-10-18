@@ -196,7 +196,7 @@ describe('Tales for Longer Nights', () => {
     await stores.settingsStore.update({ seasonalThemes: false })
     renderHome()
     await screen.findByRole('heading', { name: 'Your Shortlist' })
-    await screen.findByText(/Great free stories, picked for you/)
+    await screen.findByText(/Free classics, picked for you/)
     expect(screen.queryByRole('region', { name: /Longer Nights/ })).toBeNull()
   })
 
@@ -296,21 +296,21 @@ describe('the line under the heading', () => {
     expect(
       await screen.findByText('Fresh picks for longer nights'),
     ).toBeInTheDocument()
-    expect(screen.queryByText(/Great free stories, picked for you/)).toBeNull()
+    expect(screen.queryByText(/Free classics, picked for you/)).toBeNull()
   })
 
   it('is the usual tagline out of season, and with seasonal themes off', async () => {
     on(12, 1)
     const first = renderHome()
     expect(
-      await screen.findByText(/Great free stories, picked for you/),
+      await screen.findByText(/Free classics, picked for you/),
     ).toBeInTheDocument()
     first.unmount()
     on(10, 16)
     await stores.settingsStore.update({ seasonalThemes: false })
     renderHome()
     expect(
-      await screen.findByText(/Great free stories, picked for you/),
+      await screen.findByText(/Free classics, picked for you/),
     ).toBeInTheDocument()
     expect(screen.queryByText('Fresh picks for longer nights')).toBeNull()
   })

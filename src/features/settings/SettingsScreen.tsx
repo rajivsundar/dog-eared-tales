@@ -175,11 +175,12 @@ export function SettingsScreen() {
           About
         </h2>
         <p className="mt-2">
-          Named after Nathaniel Hawthorne’s Twice-Told Tales (1837) — stories
-          worth telling again.
+          A dog-ear is the folded corner of a page, the mark of a book somebody
+          loved. Dog-Eared Tales is a place for stories worth turning down a
+          corner for.
         </p>
         <p className="mt-2 text-muted">
-          Twice Told is for readers 16 and over.
+          Dog-Eared Tales is for readers 16 and over.
         </p>
         <p className="mt-2 text-muted">
           Some descriptions are written by AI and not yet checked by a person.

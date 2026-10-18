@@ -105,7 +105,7 @@ export function fakeStores(manager: ProfileManagerOptions = {}) {
   const dataStore: DataStore = {
     exportAll: async (): Promise<ProfileBackup> => ({
       kind: 'profile',
-      app: 'twice-told',
+      app: 'dog-eared-tales',
       schemaVersion: BACKUP_SCHEMA_VERSION,
       exportedAt: new Date().toISOString(),
       stores: {

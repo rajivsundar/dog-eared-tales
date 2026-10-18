@@ -83,7 +83,7 @@ afterEach(() => {
 describe('empty states', () => {
   it.each([
     ['reading', /Nothing in progress yet/],
-    ['dog-eared', /Nothing dog-eared yet/],
+    ['dog-eared', /Nothing kept yet/],
     ['finished', /No finished stories yet/],
   ])('the %s tab says so and links to Your Shortlist', async (id, text) => {
     renderLibrary(`/library?tab=${id}`)
@@ -122,7 +122,7 @@ describe('tabs', () => {
     await screen.findByText(/Nothing in progress yet/)
     fireEvent.keyDown(tab('Reading'), { key: 'ArrowRight' })
     expect(await screen.findByText('Story 4')).toBeInTheDocument()
-    expect(tab('Dog-eared')).toHaveAttribute('aria-selected', 'true')
+    expect(tab('Kept')).toHaveAttribute('aria-selected', 'true')
   })
 
   it('shows the finish date on Finished', async () => {
@@ -141,7 +141,7 @@ describe('tabs', () => {
     await stores.eventLog.append({ workId: 'story-1', type: 'open' })
     renderLibrary()
     await screen.findByText(/Nothing in progress yet/)
-    fireEvent.click(tab('Dog-eared'))
+    fireEvent.click(tab('Kept'))
     expect(await screen.findByText('Story 1')).toBeInTheDocument()
   })
 
@@ -155,8 +155,8 @@ describe('tabs', () => {
     })
     renderLibrary()
     expect(await screen.findByText('Story 1')).toBeInTheDocument()
-    fireEvent.click(tab('Dog-eared'))
-    expect(await screen.findByText(/Nothing dog-eared yet/)).toBeInTheDocument()
+    fireEvent.click(tab('Kept'))
+    expect(await screen.findByText(/Nothing kept yet/)).toBeInTheDocument()
   })
 })
 
@@ -344,7 +344,7 @@ describe('offline icons in the Library', () => {
     const reading = await screen.findByText('Story 2')
     expect(icons(reading.closest('li')!)).toHaveLength(0)
 
-    fireEvent.click(tab('Dog-eared'))
+    fireEvent.click(tab('Kept'))
     const stored = (await screen.findByText('Story 3')).closest('li')!
     const notStored = screen.getByText('Story 4').closest('li')!
     await waitFor(() => expect(icons(stored)).toHaveLength(1))

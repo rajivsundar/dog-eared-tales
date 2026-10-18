@@ -142,7 +142,9 @@ export function ProfilesSection() {
         Profiles keep reading separate; they don’t lock anyone out. Each one has
         its own picks, Library and place in every story, kept on this device.
       </p>
-      <p className="mt-2 text-muted">Twice Told is for readers 16 and over.</p>
+      <p className="mt-2 text-muted">
+        Dog-Eared Tales is for readers 16 and over.
+      </p>
 
       {guest && (
         <div className="mt-4 rounded-card border border-dashed border-line bg-surface p-4">
@@ -295,8 +297,8 @@ export function ProfilesSection() {
                 >
                   <p>
                     Delete {profile.name} and everything they’ve read, Dog-eared
-                    and taught Twice Told? Other profiles are not touched. It
-                    cannot be undone.
+                    and taught Dog-Eared Tales? Other profiles are not touched.
+                    It cannot be undone.
                   </p>
                   <label className="mt-3 block">
                     <span className="block">Type {DELETE_WORD} to confirm</span>

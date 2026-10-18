@@ -8,7 +8,7 @@ import type {
   Settings,
 } from './types'
 
-export const DB_NAME = 'twice-told'
+export const DB_NAME = 'dog-eared-tales'
 
 /**
  * The only place that defines the IndexedDB schema.

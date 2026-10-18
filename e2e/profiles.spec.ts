@@ -21,7 +21,7 @@ async function dogEarFirst(page: Page): Promise<string> {
 
 async function dogEared(page: Page) {
   await goTab(page, 'Library')
-  await page.getByRole('tab', { name: /Dog-eared/ }).click()
+  await page.getByRole('tab', { name: /Kept/ }).click()
 }
 
 async function addProfile(page: Page, name: string) {
@@ -93,7 +93,7 @@ test('add a profile, onboard it, switch back, use the guest, delete a profile', 
     await page.evaluate(
       async () =>
         (await indexedDB.databases()).filter((d) =>
-          d.name?.startsWith('twice-told-guest-'),
+          d.name?.startsWith('dog-eared-tales-guest-'),
         ).length,
     ),
   ).toBeLessThanOrEqual(1)
@@ -110,7 +110,7 @@ test('add a profile, onboard it, switch back, use the guest, delete a profile', 
       page.evaluate(
         async () =>
           (await indexedDB.databases()).filter((d) =>
-            d.name?.startsWith('twice-told-guest-'),
+            d.name?.startsWith('dog-eared-tales-guest-'),
           ).length,
       ),
     )
@@ -174,7 +174,7 @@ test('an existing reader’s data moves into the profile "Me", and the old datab
   await page.evaluate(
     () =>
       new Promise<void>((resolve, reject) => {
-        const open = indexedDB.open('twice-told', 10)
+        const open = indexedDB.open('dog-eared-tales', 10)
         open.onerror = () => reject(open.error)
         open.onupgradeneeded = () => {
           const db = open.result
@@ -235,6 +235,8 @@ test('an existing reader’s data moves into the profile "Me", and the old datab
   const names = await page.evaluate(async () =>
     (await indexedDB.databases()).map((d) => d.name),
   )
-  expect(names).not.toContain('twice-told')
-  expect(names.filter((n) => n?.startsWith('twice-told-p-'))).toHaveLength(1)
+  expect(names).not.toContain('dog-eared-tales')
+  expect(names.filter((n) => n?.startsWith('dog-eared-tales-p-'))).toHaveLength(
+    1,
+  )
 })

@@ -3,7 +3,7 @@
  * vite.config.ts); this module also fills it ahead of time for the works the reader is likely to open.
  */
 
-export const TEXTS_CACHE = 'twice-told-texts'
+export const TEXTS_CACHE = 'dog-eared-tales-texts'
 /** Leave the texts alone if less than this much storage is free. */
 export const MIN_FREE_BYTES = 50 * 1024 * 1024
 

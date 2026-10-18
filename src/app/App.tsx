@@ -51,7 +51,7 @@ function StorageProblem() {
     <main className="mx-auto max-w-xl px-4 py-12 text-center">
       <h1 className="text-2xl font-bold">We couldn’t open your reading data</h1>
       <p className="mt-3">
-        Nothing has been changed or lost. Close other Twice Told tabs, then
+        Nothing has been changed or lost. Close other Dog-Eared Tales tabs, then
         reload the page to try again.
       </p>
     </main>

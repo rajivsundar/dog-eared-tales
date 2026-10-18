@@ -1,10 +1,10 @@
 # CONTEXT.md — Product context
 
-**Name:** Twice Told (formerly LuminaRead)
+**Name:** Dog-Eared Tales (a separate product, forked from Twice Told v1.0)
 
-**Tagline:** "Great free stories, picked for you. Start short. Fall for the classics."
+**Tagline:** "Free classics, picked for you. Start short. Fold down a corner when one gets you."
 
-**About:** "Named after Nathaniel Hawthorne's Twice-Told Tales (1837) — stories worth telling again."
+**About:** "A dog-ear is the folded corner of a page, the mark of a book somebody loved. Dog-Eared Tales is a place for stories worth turning down a corner for."
 
 ## Glossary
 
@@ -13,7 +13,7 @@
 | Your Shortlist                 | the daily set of 6 picks                             | `shortlist`      | Today's Shelf         |
 | Tonight's Shortlist            | the shortlist's title from 6 pm to 4 am              | `shortlist`      | Tonight's shelf       |
 | Dog-ear / Dog-ear it for later | keep a work to read later (button / tooltip)         | `save`           | Save / Save for later |
-| Dog-eared                      | Library tab of kept works                            | `saved`          | Saved                 |
+| Kept                           | Library tab of dog-eared works                       | `saved`          | Saved, Dog-eared      |
 | Your Long List                 | row of longer works offered once the reader is ready | `longList`       | Longer reads          |
 | Profiles / Profile             | one person's reading on this device (not an account) | `readingProfile` | —                     |
 | Who's reading?                 | the screen that asks which profile to open           | `/who`           | —                     |

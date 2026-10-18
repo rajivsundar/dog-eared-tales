@@ -23,7 +23,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const PORT = 4173
 const DEV_PORT = 5173
 const PID_FILE = path.join(ROOT, '.cache', 'e2e-server.pid')
-const MARKER = 'x-twice-told-e2e'
+const MARKER = 'x-dog-eared-tales-e2e'
 
 /** What answers on a port: nothing, or its response headers. */
 function probe(port) {

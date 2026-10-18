@@ -25,7 +25,7 @@ export interface BackupStores {
 
 /** One reading profile's backup. Version 1 files (before profiles) read as this, with no name. */
 export interface ProfileBackup {
-  app: 'twice-told'
+  app: 'dog-eared-tales'
   schemaVersion: number
   kind: 'profile'
   /** When the backup was made, as an ISO date and time. */
@@ -38,7 +38,7 @@ export interface ProfileBackup {
 
 /** Every reading profile on the device. */
 export interface AllBackup {
-  app: 'twice-told'
+  app: 'dog-eared-tales'
   schemaVersion: number
   kind: 'all'
   exportedAt: string
@@ -110,7 +110,7 @@ function checkStores(stores: unknown): BackupStores {
 }
 
 /**
- * Reads a backup file's text. Refuses anything that is not a Twice Told backup, or is from a newer
+ * Reads a backup file's text. Refuses anything that is not a Dog-Eared Tales backup, or is from a newer
  * version. A version 1 file (one reader, no name) comes back as a one-profile backup.
  */
 export function parseBackup(text: string): BackupFile {
@@ -118,24 +118,27 @@ export function parseBackup(text: string): BackupFile {
   try {
     data = JSON.parse(text)
   } catch {
-    throw new BackupError('not-json', 'This file is not a Twice Told backup.')
+    throw new BackupError(
+      'not-json',
+      'This file is not a Dog-Eared Tales backup.',
+    )
   }
   const file = data as Record<string, unknown> | null
   if (
     !file ||
     typeof file !== 'object' ||
-    file.app !== 'twice-told' ||
+    file.app !== 'dog-eared-tales' ||
     typeof file.schemaVersion !== 'number'
   ) {
     throw new BackupError(
       'not-a-backup',
-      'This file is not a Twice Told backup.',
+      'This file is not a Dog-Eared Tales backup.',
     )
   }
   if (file.schemaVersion > BACKUP_SCHEMA_VERSION) {
     throw new BackupError(
       'newer-version',
-      `This backup was made by a newer version of Twice Told (format ${file.schemaVersion}). Update the app, then try again.`,
+      `This backup was made by a newer version of Dog-Eared Tales (format ${file.schemaVersion}). Update the app, then try again.`,
     )
   }
   const exportedAt =
@@ -149,7 +152,7 @@ export function parseBackup(text: string): BackupFile {
     if (file.profiles.length > MAX_READING_PROFILES) {
       throw new BackupError(
         'too-many-profiles',
-        `This backup has more than ${MAX_READING_PROFILES} profiles, which Twice Told cannot keep.`,
+        `This backup has more than ${MAX_READING_PROFILES} profiles, which Dog-Eared Tales cannot keep.`,
       )
     }
     const profiles = (file.profiles as Record<string, unknown>[]).map((p) => {
@@ -160,7 +163,7 @@ export function parseBackup(text: string): BackupFile {
     })
     const index = Number(file.activeIndex)
     return {
-      app: 'twice-told',
+      app: 'dog-eared-tales',
       schemaVersion: file.schemaVersion,
       kind: 'all',
       exportedAt,
@@ -169,7 +172,7 @@ export function parseBackup(text: string): BackupFile {
     }
   }
   const backup: ProfileBackup = {
-    app: 'twice-told',
+    app: 'dog-eared-tales',
     schemaVersion: file.schemaVersion,
     kind: 'profile',
     exportedAt,

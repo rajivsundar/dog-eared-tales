@@ -52,7 +52,9 @@ let stores: ReturnType<typeof fakeStores>
 
 /** A new tab: new session storage, and a profile manager that starts up afresh. */
 function newTab(options: { alreadyPicked?: boolean } = {}) {
-  session = new Map(options.alreadyPicked ? [['twice-told-picked', '1']] : [])
+  session = new Map(
+    options.alreadyPicked ? [['dog-eared-tales-picked', '1']] : [],
+  )
   return {
     getItem: (k: string) => session.get(k) ?? null,
     setItem: (k: string, v: string) => void session.set(k, v),
@@ -234,7 +236,7 @@ describe('two profiles', () => {
     await waitFor(() =>
       expect(stores.profileManager.current().mode).toBe('profile'),
     )
-    expect(session.get('twice-told-guest')).toBeUndefined()
+    expect(session.get('dog-eared-tales-guest')).toBeUndefined()
   })
 
   it('after 30 minutes away, coming back shows Who’s reading? and returns to the same page', async () => {
@@ -313,7 +315,7 @@ describe('Settings → Profiles', () => {
       ),
     ).toBeInTheDocument()
     expect(
-      screen.getAllByText('Twice Told is for readers 16 and over.'),
+      screen.getAllByText('Dog-Eared Tales is for readers 16 and over.'),
     ).toHaveLength(2) // Profiles and About
   })
 

@@ -79,7 +79,7 @@ export function WelcomeHero({
       {/* Text */}
       <div className="relative z-10 text-center lg:text-left">
         <p className="font-serif text-lg font-bold tracking-wide text-accent">
-          Twice Told
+          Dog-Eared Tales
         </p>
         <h1
           id="welcome-title"
@@ -128,11 +128,12 @@ export function WelcomeHero({
             onClick={() => setWhyOpen((open) => !open)}
             className="inline-flex min-h-11 items-center text-sm text-muted underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
-            Why “Twice Told”?
+            Why “Dog-Eared Tales”?
           </button>
           <p id={whyId} hidden={!whyOpen} className="mt-1 text-sm">
-            Named after Nathaniel Hawthorne’s Twice-Told Tales (1837) — stories
-            worth telling again.
+            A dog-ear is the folded corner of a page, the mark of a book
+            somebody loved. Dog-Eared Tales is a place for stories worth turning
+            down a corner for.
           </p>
         </div>
       </div>

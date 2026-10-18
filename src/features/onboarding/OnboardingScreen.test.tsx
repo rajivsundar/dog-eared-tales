@@ -141,12 +141,12 @@ const welcome = async () => {
 describe('the welcome page', () => {
   it('has the wordmark, the headline as the h1, the subline and the trust line', async () => {
     await welcome()
-    expect(screen.getByText('Twice Told')).toBeInTheDocument()
+    expect(screen.getByText('Dog-Eared Tales')).toBeInTheDocument()
     const h1 = screen.getByRole('heading', { level: 1 })
-    expect(h1).toHaveTextContent('Great free stories, picked for you.')
+    expect(h1).toHaveTextContent('Free classics, picked for you.')
     expect(h1).toHaveFocus()
     expect(
-      screen.getByText('Start short. Fall for the classics.'),
+      screen.getByText('Start short. Fold down a corner when one gets you.'),
     ).toBeInTheDocument()
     expect(
       screen.getByText(
@@ -182,12 +182,12 @@ describe('the welcome page', () => {
     ).toBeEnabled()
   })
 
-  it('reveals the Hawthorne line from "Why Twice Told?" and hides it again', async () => {
+  it('reveals the About note from "Why Dog-Eared Tales?" and hides it again', async () => {
     await welcome()
-    const why = screen.getByRole('button', { name: /Why .Twice Told.\?/ })
+    const why = screen.getByRole('button', { name: /Why .Dog-Eared Tales.\?/ })
     expect(why).toHaveAttribute('aria-expanded', 'false')
     const line =
-      'Named after Nathaniel Hawthorne’s Twice-Told Tales (1837) — stories worth telling again.'
+      'A dog-ear is the folded corner of a page, the mark of a book somebody loved. Dog-Eared Tales is a place for stories worth turning down a corner for.'
     expect(screen.getByText(line)).not.toBeVisible()
     fireEvent.click(why)
     expect(why).toHaveAttribute('aria-expanded', 'true')
@@ -228,7 +228,7 @@ describe('the welcome page', () => {
     setDate(2026, 12, 1)
     await welcome()
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-      'Great free stories, picked for you.',
+      'Free classics, picked for you.',
     )
     expect(
       screen.getByRole('button', { name: 'Read a short story now' }),
@@ -369,7 +369,7 @@ describe('"Pick my moods first"', () => {
     await toMoodBoard()
     click('Back')
     expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(
-      'Great free stories, picked for you.',
+      'Free classics, picked for you.',
     )
   })
 })
@@ -489,7 +489,7 @@ describe('the fall artwork on the welcome page', () => {
     renderOnboarding()
     await screen.findByTestId('featured-story')
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-      'Great free stories, picked for you.',
+      'Free classics, picked for you.',
     )
     expect(
       screen.getByRole('button', { name: 'Read a short story now' }),

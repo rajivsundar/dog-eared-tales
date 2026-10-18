@@ -114,7 +114,7 @@ describe('About', () => {
     ).toBeInTheDocument()
     expect(
       screen.getByText(
-        'Named after Nathaniel Hawthorne’s Twice-Told Tales (1837) — stories worth telling again.',
+        'A dog-ear is the folded corner of a page, the mark of a book somebody loved. Dog-Eared Tales is a place for stories worth turning down a corner for.',
       ),
     ).toBeInTheDocument()
     const redo = screen.getByRole('link', { name: 'Redo onboarding' })

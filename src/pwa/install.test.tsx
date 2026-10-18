@@ -121,7 +121,7 @@ describe('detecting the environment', () => {
 })
 
 describe('the install control', () => {
-  it('shows "Install Twice Told" once the browser offers the prompt, and uses it', async () => {
+  it('shows "Install Dog-Eared Tales" once the browser offers the prompt, and uses it', async () => {
     setEnvironment({ standalone: false })
     render(<InstallControl />)
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
@@ -129,7 +129,7 @@ describe('the install control', () => {
     const event = fakePrompt()
     act(() => setDeferredPromptForTest(event))
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Install Twice Told' }),
+      await screen.findByRole('button', { name: 'Install Dog-Eared Tales' }),
     )
     await act(async () => {})
     expect(event.prompt).toHaveBeenCalledTimes(1)
@@ -146,7 +146,7 @@ describe('the install control', () => {
     })
     expect(preventDefault).toHaveBeenCalled()
     expect(
-      await screen.findByRole('button', { name: 'Install Twice Told' }),
+      await screen.findByRole('button', { name: 'Install Dog-Eared Tales' }),
     ).toBeInTheDocument()
     expect(await promptInstall()).toBe('accepted')
     expect(await promptInstall()).toBe('unavailable')
@@ -157,7 +157,7 @@ describe('the install control', () => {
     setDeferredPromptForTest(fakePrompt())
     render(<InstallControl />)
     expect(
-      screen.queryByRole('button', { name: 'Install Twice Told' }),
+      screen.queryByRole('button', { name: 'Install Dog-Eared Tales' }),
     ).not.toBeInTheDocument()
     expect(document.body).toHaveTextContent('')
   })

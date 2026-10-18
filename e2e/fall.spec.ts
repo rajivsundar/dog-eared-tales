@@ -36,9 +36,7 @@ test('out of season, or with the toggle off, nothing seasonal shows', async ({
   await expect(page.getByRole('region', { name: /Longer Nights/ })).toHaveCount(
     0,
   )
-  await expect(
-    page.getByText(/Great free stories, picked for you/),
-  ).toBeVisible()
+  await expect(page.getByText(/Free classics, picked for you/)).toBeVisible()
 
   // In fall, switching the toggle off removes it all.
   const fall = await page.context().newPage()
@@ -57,9 +55,7 @@ test('out of season, or with the toggle off, nothing seasonal shows', async ({
     .getByRole('navigation', { name: 'Main' })
     .getByRole('link', { name: 'Shortlist' })
     .click()
-  await expect(
-    fall.getByText(/Great free stories, picked for you/),
-  ).toBeVisible()
+  await expect(fall.getByText(/Free classics, picked for you/)).toBeVisible()
   await expect(fall.getByRole('region', { name: /Longer Nights/ })).toHaveCount(
     0,
   )
@@ -74,7 +70,7 @@ test('the welcome preview shows the artwork and changes nothing', async ({
     page.evaluate(async () => {
       const out: Record<string, unknown> = {}
       for (const d of await indexedDB.databases()) {
-        if (!d.name?.startsWith('twice-told-p-')) continue
+        if (!d.name?.startsWith('dog-eared-tales-p-')) continue
         out[d.name] = await new Promise((resolve) => {
           const open = indexedDB.open(d.name!)
           open.onsuccess = () => {
@@ -220,7 +216,7 @@ for (const [width, height, label] of [
     // At 360 px the leaves are all above the wordmark.
     if (width === 360) {
       const wordmark = (await page
-        .getByText('Twice Told', { exact: true })
+        .getByText('Dog-Eared Tales', { exact: true })
         .first()
         .boundingBox())!
       const box = (await container.boundingBox())!

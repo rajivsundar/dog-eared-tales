@@ -19,7 +19,7 @@ import { type LibraryLists, sortLibrary } from './libraryLists'
 
 const TABS = [
   { id: 'reading', label: 'Reading' },
-  { id: 'dog-eared', label: 'Dog-eared' },
+  { id: 'dog-eared', label: 'Kept' },
   { id: 'finished', label: 'Finished' },
 ] as const
 type TabId = (typeof TABS)[number]['id']
@@ -27,7 +27,7 @@ type TabId = (typeof TABS)[number]['id']
 const EMPTY: Record<TabId, string> = {
   reading:
     'Nothing in progress yet. Start a story and it will wait for you here.',
-  'dog-eared': 'Nothing dog-eared yet. Dog-ear a story to keep it for later.',
+  'dog-eared': 'Nothing kept yet. Dog-ear a story and it waits here.',
   finished: 'No finished stories yet. Your first one will be here.',
 }
 

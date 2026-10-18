@@ -84,7 +84,7 @@ describe('Your Shortlist', () => {
   it('shows the name, the tagline and 6 cards with cover, title, author, minutes and reason', async () => {
     renderHome()
     expect(
-      screen.getByRole('heading', { name: 'Twice Told', level: 1 }),
+      screen.getByRole('heading', { name: 'Dog-Eared Tales', level: 1 }),
     ).toBeInTheDocument()
     expect(
       await screen.findByRole('heading', { name: 'Your Shortlist' }),

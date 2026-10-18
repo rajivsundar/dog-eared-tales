@@ -16,10 +16,10 @@ test('the web app manifest describes the app', async ({ page, request }) => {
   expect(response.ok()).toBe(true)
   const manifest = await response.json()
   expect(manifest).toMatchObject({
-    name: 'Twice Told',
-    short_name: 'Twice Told',
+    name: 'Dog-Eared Tales',
+    short_name: 'Dog-Eared Tales',
     description:
-      'Great free stories, picked for you. Start short. Fall for the classics.',
+      'Free classics, picked for you. Start short. Fold down a corner when one gets you.',
     start_url: '/',
     display: 'standalone',
     theme_color: '#1b1c1f',
@@ -72,7 +72,7 @@ test('works offline: the shell, library and a story that was opened before', asy
     'ready',
   )
   const texts = await page.evaluate(async () => {
-    const keys = await (await caches.open('twice-told-texts')).keys()
+    const keys = await (await caches.open('dog-eared-tales-texts')).keys()
     return keys.map((r) => new URL(r.url).pathname)
   })
   expect(texts).toContain('/texts/pg-1063.epub')

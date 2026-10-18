@@ -21,7 +21,7 @@ import { newTestDb } from './testDb'
 /** The same three jobs as the open profile's dataStore, over one database. */
 const createDataStore = (target: TwiceToldDB) => ({
   exportAll: async (): Promise<ProfileBackup> => ({
-    app: 'twice-told',
+    app: 'dog-eared-tales',
     schemaVersion: BACKUP_SCHEMA_VERSION,
     kind: 'profile',
     exportedAt: new Date().toISOString(),
@@ -92,7 +92,7 @@ describe('exporting', () => {
   it('writes every store, with the app name, a schema version and a date', async () => {
     await fill(db)
     const backup = await everything(db)
-    expect(backup.app).toBe('twice-told')
+    expect(backup.app).toBe('dog-eared-tales')
     expect(backup.schemaVersion).toBe(BACKUP_SCHEMA_VERSION)
     expect(new Date(backup.exportedAt).toString()).not.toBe('Invalid Date')
     expect(Object.keys(backup.stores).sort()).toEqual([
@@ -251,7 +251,7 @@ describe('the version 2 file formats', () => {
 
   it('still reads a version 1 file, as one profile with no name', () => {
     const v1 = {
-      app: 'twice-told',
+      app: 'dog-eared-tales',
       schemaVersion: 1,
       exportedAt: '2026-01-01T00:00:00.000Z',
       stores: emptyStores,
@@ -264,7 +264,7 @@ describe('the version 2 file formats', () => {
 
   it('reads an all-profiles file, with the profile that was open', () => {
     const all = {
-      app: 'twice-told',
+      app: 'dog-eared-tales',
       schemaVersion: 2,
       kind: 'all',
       exportedAt: '2026-01-01T00:00:00.000Z',
@@ -286,7 +286,7 @@ describe('the version 2 file formats', () => {
     const profile = { name: 'A', color: 'rust', stores: emptyStores }
     const make = (profiles: unknown[]) =>
       JSON.stringify({
-        app: 'twice-told',
+        app: 'dog-eared-tales',
         schemaVersion: 2,
         kind: 'all',
         exportedAt: 'x',

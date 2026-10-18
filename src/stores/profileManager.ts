@@ -137,10 +137,10 @@ export interface ProfileManagerOptions {
   }
 }
 
-const GUEST_KEY = 'twice-told-guest'
-const PICKED_KEY = 'twice-told-picked'
-const OPEN_KEY = 'twice-told-open'
-const LOCK_NAME = 'twice-told-profiles'
+const GUEST_KEY = 'dog-eared-tales-guest'
+const PICKED_KEY = 'dog-eared-tales-picked'
+const OPEN_KEY = 'dog-eared-tales-open'
+const LOCK_NAME = 'dog-eared-tales-profiles'
 const AWAY_LIMIT = 30 * 60 * 1000
 
 interface Active {
@@ -164,8 +164,8 @@ export function createProfileManager(
   options: ProfileManagerOptions = {},
 ): ProfileManager {
   const registryName = options.registryName ?? REGISTRY_NAME
-  const profilePrefix = options.profilePrefix ?? 'twice-told-p-'
-  const guestPrefix = options.guestPrefix ?? 'twice-told-guest-'
+  const profilePrefix = options.profilePrefix ?? 'dog-eared-tales-p-'
+  const guestPrefix = options.guestPrefix ?? 'dog-eared-tales-guest-'
   const legacyName = options.legacyName ?? DB_NAME
   const now = options.now ?? Date.now
   const session: SessionStorageLike | null =
@@ -617,7 +617,7 @@ export function createProfileManager(
         if (profiles.length >= MAX_READING_PROFILES) {
           throw new ProfileError(
             'too-many',
-            `Twice Told keeps up to ${MAX_READING_PROFILES} profiles on one device.`,
+            `Dog-Eared Tales keeps up to ${MAX_READING_PROFILES} profiles on one device.`,
           )
         }
         const name = cleanName(input.name ?? suggestName())
@@ -746,7 +746,7 @@ export function createProfileManager(
       const open = snapshot.active
       const stores = await run((db) => readStores(db))
       return {
-        app: 'twice-told',
+        app: 'dog-eared-tales',
         schemaVersion: BACKUP_SCHEMA_VERSION,
         kind: 'profile',
         exportedAt: new Date(now()).toISOString(),
@@ -768,7 +768,7 @@ export function createProfileManager(
         if (profiles.length >= MAX_READING_PROFILES) {
           throw new ProfileError(
             'too-many',
-            `Twice Told keeps up to ${MAX_READING_PROFILES} profiles on one device.`,
+            `Dog-Eared Tales keeps up to ${MAX_READING_PROFILES} profiles on one device.`,
           )
         }
         const name = fitName(
@@ -828,7 +828,7 @@ export function createProfileManager(
         (p) => active?.mode === 'profile' && p.id === active.id,
       )
       return {
-        app: 'twice-told',
+        app: 'dog-eared-tales',
         schemaVersion: BACKUP_SCHEMA_VERSION,
         kind: 'all',
         exportedAt: new Date(now()).toISOString(),

@@ -1,4 +1,4 @@
-# AGENTS.md — Project rules for Twice Told
+# AGENTS.md — Project rules for Dog-Eared Tales
 
 ## How we work
 

@@ -33,7 +33,7 @@ export function EndScreen({
           data-testid="install-offer"
           className="mt-2 flex max-w-sm flex-col items-center gap-2 text-sm"
         >
-          <p>Keep Twice Told on your device, and read offline.</p>
+          <p>Keep Dog-Eared Tales on your device, and read offline.</p>
           <InstallControl />
         </div>
       )}

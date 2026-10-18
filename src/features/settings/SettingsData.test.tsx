@@ -206,14 +206,14 @@ describe('Settings → Install', () => {
     return e
   }
 
-  it('offers Install Twice Told when the browser gave us a prompt', async () => {
+  it('offers Install Dog-Eared Tales when the browser gave us a prompt', async () => {
     setDeferredPromptForTest(event())
     renderSettings()
     expect(
       await screen.findByRole('heading', { name: 'Install' }),
     ).toBeInTheDocument()
     expect(
-      screen.getByRole('button', { name: 'Install Twice Told' }),
+      screen.getByRole('button', { name: 'Install Dog-Eared Tales' }),
     ).toBeInTheDocument()
   })
 
@@ -226,7 +226,7 @@ describe('Settings → Install', () => {
       screen.queryByRole('heading', { name: 'Install' }),
     ).not.toBeInTheDocument()
     expect(
-      screen.queryByRole('button', { name: 'Install Twice Told' }),
+      screen.queryByRole('button', { name: 'Install Dog-Eared Tales' }),
     ).not.toBeInTheDocument()
   })
 
@@ -270,13 +270,13 @@ describe('Settings → Your data: export', () => {
     })
     await waitFor(() => expect(downloads).toHaveLength(1))
     expect(downloads[0].name).toMatch(
-      /^twice-told-backup-\d{4}-\d{2}-\d{2}\.json$/,
+      /^dog-eared-tales-backup-\d{4}-\d{2}-\d{2}\.json$/,
     )
     const file = JSON.parse(await downloads[0].blob.text())
     expect(file.schemaVersion).toBe(BACKUP_SCHEMA_VERSION)
     expect(file.kind).toBe('profile')
     expect(file.name).toBe('Me')
-    expect(file.app).toBe('twice-told')
+    expect(file.app).toBe('dog-eared-tales')
     expect(Object.keys(file.stores).sort()).toEqual([
       'events',
       'highlights',
@@ -288,7 +288,7 @@ describe('Settings → Your data: export', () => {
     expect(file.stores.events).toHaveLength(1)
     expect(file.stores.library[0].workId).toBe('story-2')
     expect(await screen.findByRole('status')).toHaveTextContent(
-      /Saved twice-told-backup-/,
+      /Saved dog-eared-tales-backup-/,
     )
   })
 
@@ -305,14 +305,14 @@ describe('Settings → Your data: export', () => {
       )
     })
     await waitFor(() => expect(downloads).toHaveLength(1))
-    expect(downloads[0].name).toMatch(/^twice-told-backup-me-\d{4}/)
+    expect(downloads[0].name).toMatch(/^dog-eared-tales-backup-me-\d{4}/)
     await act(async () => {
       fireEvent.click(
         screen.getByRole('button', { name: 'Export all profiles' }),
       )
     })
     await waitFor(() => expect(downloads).toHaveLength(2))
-    expect(downloads[1].name).toMatch(/^twice-told-all-profiles-\d{4}/)
+    expect(downloads[1].name).toMatch(/^dog-eared-tales-all-profiles-\d{4}/)
     const all = JSON.parse(await downloads[1].blob.text())
     expect(all.kind).toBe('all')
     expect(all.profiles.map((p: { name: string }) => p.name)).toEqual([
@@ -444,7 +444,7 @@ describe('Settings → Your data: import', () => {
       backupFile({ ...backup, schemaVersion: BACKUP_SCHEMA_VERSION + 1 }),
     )
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      /newer version of Twice Told/,
+      /newer version of Dog-Eared Tales/,
     )
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
   })
@@ -454,7 +454,7 @@ describe('Settings → Your data: import', () => {
     await data.library.save('story-2')
     const { stores: contents } = await stores.profileManager.exportProfile()
     const v1 = {
-      app: 'twice-told',
+      app: 'dog-eared-tales',
       schemaVersion: 1,
       exportedAt: '2026-01-01T00:00:00.000Z',
       stores: contents,
@@ -480,11 +480,11 @@ describe('Settings → Your data: import', () => {
     renderSettings()
     await chooseFile(new File(['this is not json'], 'notes.txt'))
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'This file is not a Twice Told backup.',
+      'This file is not a Dog-Eared Tales backup.',
     )
     await chooseFile(backupFile({ hello: 'world' }))
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'This file is not a Twice Told backup.',
+      'This file is not a Dog-Eared Tales backup.',
     )
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
   })

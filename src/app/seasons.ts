@@ -44,8 +44,8 @@ export type SeasonArtId = 'fall'
 
 /** What the welcome page shows when no season is active. */
 export const DEFAULT_WELCOME = {
-  headline: 'Great free stories, picked for you.',
-  subline: 'Start short. Fall for the classics.',
+  headline: 'Free classics, picked for you.',
+  subline: 'Start short. Fold down a corner when one gets you.',
   primaryButton: 'Read a short story now',
   featuredStoryId: 'pg-269-the-open-window',
   coverIds: [

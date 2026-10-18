@@ -21,4 +21,4 @@ The schema lives in `db.ts`. To change it, add a new `this.version(n + 1).stores
 
 ## Reading profiles
 
-Each reading profile has its own database (`twice-told-p-<id>`, the schema in `db.ts`); `twice-told-profiles` (`registry.ts`) lists them. `profileStore`, `eventLog`, `libraryStore`, `progressStore`, `highlightStore` and `settingsStore` are forwarders: each call goes to the profile that was open when it was made, and a switch waits for calls in flight. The old single `twice-told` database is migrated into a profile "Me" on first start (`profileManager.ts`, tested in `migration.test.ts`).
+Each reading profile has its own database (`dog-eared-tales-p-<id>`, the schema in `db.ts`); `dog-eared-tales-profiles` (`registry.ts`) lists them. `profileStore`, `eventLog`, `libraryStore`, `progressStore`, `highlightStore` and `settingsStore` are forwarders: each call goes to the profile that was open when it was made, and a switch waits for calls in flight. The old single `dog-eared-tales` database is migrated into a profile "Me" on first start (`profileManager.ts`, tested in `migration.test.ts`).

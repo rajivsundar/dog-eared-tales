@@ -60,7 +60,7 @@ test('export, delete everything, then import brings the data back', async ({
     page.getByRole('button', { name: 'Export my data' }).click(),
   ])
   expect(download.suggestedFilename()).toMatch(
-    /^twice-told-backup-\d{4}-\d{2}-\d{2}\.json$/,
+    /^dog-eared-tales-backup-\d{4}-\d{2}-\d{2}\.json$/,
   )
   const file = testInfo.outputPath('backup.json')
   await download.saveAs(file)
@@ -118,7 +118,7 @@ test('a backup from a newer version is refused', async ({ page }) => {
   await startApp(page)
   await gotoSettings(page)
   const newer = JSON.stringify({
-    app: 'twice-told',
+    app: 'dog-eared-tales',
     schemaVersion: 99,
     exportedAt: new Date().toISOString(),
     stores: {

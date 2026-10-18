@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import type { SeasonArt } from './types'
 
 /**
- * Fall artwork. Every shape here is drawn for Twice Told: no photos, stock images or other
+ * Fall artwork. Every shape here is drawn for Dog-Eared Tales: no photos, stock images or other
  * people's art. Colours come from the app's theme tokens (ink, page, accent), so the drawings
  * read on Paper, Sepia, Night and Black. Only the lamp light and the autumn leaves keep fixed
  * warm colours.

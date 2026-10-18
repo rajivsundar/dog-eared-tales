@@ -10,12 +10,12 @@ export default function HomePage() {
     <main className="mx-auto max-w-5xl px-gutter py-8 sm:py-12">
       <header>
         <h1 className="font-serif text-3xl font-bold sm:text-4xl">
-          Twice Told
+          Dog-Eared Tales
         </h1>
         <p className="mt-2 min-h-7 text-base text-muted sm:text-lg">
           {ready &&
             (season?.shortlistSubtitle ??
-              'Great free stories, picked for you. Start short. Fall for the classics.')}
+              'Free classics, picked for you. Start short. Fold down a corner when one gets you.')}
         </p>
       </header>
       <ShortlistScreen />

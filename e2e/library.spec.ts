@@ -33,7 +33,7 @@ test('a dog-eared story moves to Reading after two pages, with minutes left', as
     .click()
   await expect(page).toHaveURL(/\/library/)
   await expect(page.getByText(/Nothing in progress yet/)).toBeVisible()
-  await page.getByRole('tab', { name: /Dog-eared/ }).click()
+  await page.getByRole('tab', { name: /Kept/ }).click()
   const entry = page.getByRole('link', { name: new RegExp(title) })
   await expect(entry).toBeVisible()
 
@@ -41,7 +41,7 @@ test('a dog-eared story moves to Reading after two pages, with minutes left', as
   await entry.click()
   await waitForReader(page)
   await page.goBack()
-  await page.getByRole('tab', { name: /Dog-eared/ }).click()
+  await page.getByRole('tab', { name: /Kept/ }).click()
   await expect(
     page.getByRole('link', { name: new RegExp(title) }),
   ).toBeVisible()
@@ -74,8 +74,8 @@ test('a dog-eared story moves to Reading after two pages, with minutes left', as
 
   // Back in the Library it has moved to Reading, with minutes left.
   await page.goBack()
-  await page.getByRole('tab', { name: /Dog-eared/ }).click()
-  await expect(page.getByText(/Nothing dog-eared yet/)).toBeVisible()
+  await page.getByRole('tab', { name: /Kept/ }).click()
+  await expect(page.getByText(/Nothing kept yet/)).toBeVisible()
   await page.getByRole('tab', { name: /Reading/ }).click()
   const reading = page.getByRole('link', { name: new RegExp(title) })
   await expect(reading).toBeVisible()
@@ -146,11 +146,11 @@ test('un-dog-ear shows Removed · Undo, and Undo brings the story back', async (
     .getByRole('navigation', { name: 'Main' })
     .getByRole('link', { name: 'Library' })
     .click()
-  await page.getByRole('tab', { name: /Dog-eared/ }).click()
+  await page.getByRole('tab', { name: /Kept/ }).click()
   await expect(page.getByRole('tabpanel').getByRole('listitem')).toHaveCount(1)
   await page.getByRole('button', { name: /^Un-dog-ear/ }).click()
   await expect(page.getByRole('status')).toContainText('Removed')
-  await expect(page.getByText(/Nothing dog-eared yet/)).toBeVisible()
+  await expect(page.getByText(/Nothing kept yet/)).toBeVisible()
   await page.getByRole('button', { name: 'Undo' }).click()
   await expect(page.getByRole('tabpanel').getByRole('listitem')).toHaveCount(1)
 })

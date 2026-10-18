@@ -35,7 +35,7 @@ test('Your Shortlist is saved for offline, and an unsaved story shows a friendly
 
   const storedTexts = () =>
     page.evaluate(async () => {
-      const keys = await (await caches.open('twice-told-texts')).keys()
+      const keys = await (await caches.open('dog-eared-tales-texts')).keys()
       return keys.map((r) => new URL(r.url).pathname)
     })
 
@@ -94,7 +94,7 @@ test('a story saved while online keeps its icon in the Library and Dog-eared', a
     .getByRole('navigation', { name: 'Main' })
     .getByRole('link', { name: 'Library' })
     .click()
-  await page.getByRole('tab', { name: /Dog-eared/ }).click()
+  await page.getByRole('tab', { name: /Kept/ }).click()
   const card = page.getByRole('tabpanel').getByRole('listitem').first()
   await expect(
     card.getByRole('img', { name: 'Available offline' }),

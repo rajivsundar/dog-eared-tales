@@ -95,8 +95,8 @@ export async function mapProfileDb(page: Page): Promise<void> {
       void this.databases().then((list) => {
         const real = list
           .map((d) => d.name ?? '')
-          .find((n) => n.startsWith('twice-told-p-'))
-        const opening = original.call(this, real ?? 'twice-told-p-missing')
+          .find((n) => n.startsWith('dog-eared-tales-p-'))
+        const opening = original.call(this, real ?? 'dog-eared-tales-p-missing')
         opening.onsuccess = () => {
           request.result = opening.result
           ;(request.onsuccess as (() => void) | undefined)?.()

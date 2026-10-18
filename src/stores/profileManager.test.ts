@@ -298,10 +298,10 @@ describe('guest mode', () => {
     const { manager, names, session } = setup()
     await manager.ready()
     await manager.startGuest()
-    expect(session.getItem('twice-told-guest')).toMatch(names.guestPrefix)
+    expect(session.getItem('dog-eared-tales-guest')).toMatch(names.guestPrefix)
     await manager.endGuest()
     expect(manager.current().mode).toBe('profile')
-    expect(session.getItem('twice-told-guest')).toBeNull()
+    expect(session.getItem('dog-eared-tales-guest')).toBeNull()
     expect(
       (await Dexie.getDatabaseNames()).some((n) =>
         n.startsWith(names.guestPrefix),
@@ -454,7 +454,7 @@ describe('export and import', () => {
     await library.save('mine')
     const { stores } = await manager.exportProfile()
     const v1: ProfileBackup = {
-      app: 'twice-told',
+      app: 'dog-eared-tales',
       schemaVersion: 1,
       kind: 'profile',
       exportedAt: 'x',
@@ -537,7 +537,7 @@ describe('delete everything', () => {
     await manager.deleteEverything()
     expect(manager.current().profiles.map((p) => p.name)).toEqual(['Me'])
     expect(manager.current().mode).toBe('profile')
-    expect(session.getItem('twice-told-guest')).toBeNull()
+    expect(session.getItem('dog-eared-tales-guest')).toBeNull()
     expect(await library.list()).toEqual([])
     expect(await manager.getPersistence()).toBeUndefined()
     const left = (await Dexie.getDatabaseNames()).filter(
