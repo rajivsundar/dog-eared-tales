@@ -14,6 +14,23 @@ export const MOODS = [
   { id: 'hopeful', label: 'Hopeful', color: '#8ab34a' },
 ] as const
 
+/**
+ * The six moods on the first-run welcome: one tap on any of them builds the first Your Shortlist.
+ * Each has at least 20 works in the catalog, so the first list is never thin.
+ */
+export const FIRST_RUN_MOOD_IDS = [
+  'funny',
+  'eerie',
+  'tense',
+  'thoughtful',
+  'adventurous',
+  'hopeful',
+] as const
+
+export const FIRST_RUN_MOODS = FIRST_RUN_MOOD_IDS.map((id) =>
+  MOODS.find((m) => m.id === id)!,
+)
+
 export const MIN_MOODS = 2
 export const MAX_MOODS = 5
 

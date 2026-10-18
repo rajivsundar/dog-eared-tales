@@ -169,17 +169,35 @@ describe('the welcome page', () => {
     ])
   })
 
-  it('has "Read a short story now" with the featured story and its minutes under it', async () => {
+  it('asks for a mood first: six mood buttons, then a smaller "Surprise me"', async () => {
     await welcome()
     expect(
-      screen.getByRole('button', { name: 'Read a short story now' }),
-    ).toBeEnabled()
+      screen.getByText('What are you in the mood for?'),
+    ).toBeInTheDocument()
+    const group = screen.getByRole('group', {
+      name: 'What are you in the mood for?',
+    })
+    const buttons = within(group).getAllByRole('button')
+    expect(buttons.map((b) => b.textContent)).toEqual([
+      'Funny',
+      'Eerie',
+      'Tense',
+      'Thoughtful',
+      'Adventurous',
+      'Hopeful',
+    ])
+    for (const b of buttons) expect(b).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Surprise me' })).toBeEnabled()
     expect(screen.getByTestId('featured-story')).toHaveTextContent(
       'The Open Window · 5 min',
     )
+    // The old buttons are gone.
     expect(
-      screen.getByRole('button', { name: 'Pick my moods first' }),
-    ).toBeEnabled()
+      screen.queryByRole('button', { name: 'Pick my moods first' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Read a short story now' }),
+    ).not.toBeInTheDocument()
   })
 
   it('reveals the About note from "Why Dog-Eared Tales?" and hides it again', async () => {
@@ -196,7 +214,7 @@ describe('the welcome page', () => {
     expect(screen.getByText(line)).not.toBeVisible()
   })
 
-  it('uses the fall content on Oct 16: headline, button, featured story and covers', async () => {
+  it('uses the fall content on Oct 16: headline, featured story and covers', async () => {
     setDate(2026, 10, 16)
     await welcome()
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
@@ -205,12 +223,7 @@ describe('the welcome page', () => {
     expect(
       screen.getByText('Great free stories, picked for you. Start short.'),
     ).toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: 'Turn over a new leaf' }),
-    ).toBeInTheDocument()
-    expect(
-      screen.queryByRole('button', { name: 'Read a short story now' }),
-    ).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Surprise me' })).toBeEnabled()
     expect(screen.getByTestId('featured-story')).toHaveTextContent(
       'The Tell-Tale Heart · 9 min',
     )
@@ -230,9 +243,7 @@ describe('the welcome page', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       'Free classics, picked for you.',
     )
-    expect(
-      screen.getByRole('button', { name: 'Read a short story now' }),
-    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Surprise me' })).toBeEnabled()
   })
 
   it('uses the halloween content on Oct 25 and Oct 31, and fall on Nov 1', async () => {
@@ -244,20 +255,18 @@ describe('the welcome page', () => {
       setDate(2026, month, day)
       const view = renderOnboarding()
       await screen.findByTestId('featured-story')
-      expect(
-        screen.getByRole('button', { name: 'Turn over a new leaf' }),
-      ).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Surprise me' })).toBeEnabled()
       view.unmount()
       resetCatalogCache()
     }
   })
 })
 
-describe('"Read a short story now"', () => {
+describe('"Surprise me"', () => {
   it('saves an empty profile and opens the featured story straight in the reader', async () => {
     await welcome()
     await act(async () => {
-      click('Read a short story now')
+      click('Surprise me')
     })
     expect(
       await screen.findByText('READER pg-269-the-open-window'),
@@ -274,7 +283,7 @@ describe('"Read a short story now"', () => {
     renderOnboarding()
     await screen.findByTestId('featured-story')
     await act(async () => {
-      click('Turn over a new leaf')
+      click('Surprise me')
     })
     expect(
       await screen.findByText('READER pg-2148-the-tell-tale-heart'),
@@ -284,7 +293,7 @@ describe('"Read a short story now"', () => {
   it('leaves the welcome page for good: this is no longer a first run', async () => {
     await welcome()
     await act(async () => {
-      click('Read a short story now')
+      click('Surprise me')
     })
     await screen.findByText(/^READER /)
     const { isFirstRun } = await import('./finishOnboarding')
@@ -297,42 +306,11 @@ describe('"Read a short story now"', () => {
   })
 })
 
-describe('"Pick my moods first"', () => {
-  async function toMoodBoard() {
+describe('one tap on a mood', () => {
+  it('goes straight to Your Shortlist: no board, no taste cards, no reading context', async () => {
     await welcome()
-    click('Pick my moods first')
-    return screen.findByRole('heading', { name: /in the mood for/ })
-  }
-
-  it('has 12 labelled toggle buttons and moves focus to the heading', async () => {
-    const heading = await toMoodBoard()
-    expect(heading).toHaveFocus()
-    const tiles = within(screen.getByRole('group')).getAllByRole('button')
-    expect(tiles).toHaveLength(12)
-    for (const tile of tiles)
-      expect(tile).toHaveAttribute('aria-pressed', 'false')
-  })
-
-  it('keeps Next disabled below 2 moods, with a hint, and allows at most 5', async () => {
-    await toMoodBoard()
-    const next = screen.getByRole('button', { name: 'Show my shortlist' })
-    expect(next).toBeDisabled()
-    expect(next).toHaveAttribute('aria-describedby', 'mood-hint')
-    expect(screen.getByText(/Pick at least 2 moods/)).toBeInTheDocument()
-    click('Eerie')
-    click('Cozy')
-    expect(next).toBeEnabled()
-    expect(screen.getByRole('status')).toHaveTextContent('2 of 5 picked')
-    for (const m of ['Funny', 'Romantic', 'Tense']) click(m)
-    expect(screen.getByRole('button', { name: 'Dark' })).toBeDisabled()
-  })
-
-  it('goes straight to Your Shortlist: no taste cards, no reading context', async () => {
-    await toMoodBoard()
-    click('Eerie')
-    click('Cozy')
     await act(async () => {
-      click('Show my shortlist')
+      click('Eerie')
     })
     expect(await screen.findByText('YOUR SHORTLIST')).toBeInTheDocument()
     expect(
@@ -340,37 +318,49 @@ describe('"Pick my moods first"', () => {
     ).not.toBeInTheDocument()
     expect(
       stores.events.filter((e) => e.type === 'onboard').map((e) => e.reason),
-    ).toEqual(['start', 'mood:eerie', 'mood:cozy'])
-    expect((await stores.settingsStore.get()).shortlist?.picks).toHaveLength(6)
+    ).toEqual(['start', 'mood:eerie'])
   })
 
-  it('has one Skip, which goes straight to the starter mix; there is no "Skip setup"', async () => {
-    await toMoodBoard()
-    expect(
-      screen.queryByRole('button', { name: 'Skip setup' }),
-    ).not.toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: /^Skip/ })).toHaveLength(1)
+  it('makes a personal first shortlist from that mood, not the starter mix', async () => {
+    await welcome()
     await act(async () => {
-      click('Skip')
+      click('Eerie')
     })
-    expect(await screen.findByText('YOUR SHORTLIST')).toBeInTheDocument()
-    expect(stores.events.filter((e) => e.type === 'onboard')).toHaveLength(1)
-    expect((await stores.profileStore.get())?.facetBeliefs).toEqual({})
+    await screen.findByText('YOUR SHORTLIST')
+    const profile = await stores.profileStore.get()
+    expect(Object.keys(profile?.facetBeliefs ?? {})).toContain('mood:eerie')
     const shortlist = (await stores.settingsStore.get()).shortlist
     expect(shortlist?.picks).toHaveLength(6)
     expect(
-      shortlist?.picks.every((p) =>
+      shortlist?.picks.some((p) =>
         p.reason.startsWith('A good place to start'),
       ),
-    ).toBe(true)
+    ).toBe(false)
   })
 
-  it('Back returns to the welcome page', async () => {
-    await toMoodBoard()
-    click('Back')
-    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(
-      'Free classics, picked for you.',
-    )
+  it('records the tapped mood for each of the six', async () => {
+    for (const mood of [
+      'Funny',
+      'Eerie',
+      'Tense',
+      'Thoughtful',
+      'Adventurous',
+      'Hopeful',
+    ]) {
+      stores = fakeStores()
+      h.current = stores
+      const view = renderOnboarding()
+      await screen.findByTestId('featured-story')
+      await act(async () => {
+        click(mood)
+      })
+      await screen.findByText('YOUR SHORTLIST')
+      expect(
+        stores.events.filter((e) => e.type === 'onboard').map((e) => e.reason),
+      ).toEqual(['start', `mood:${mood.toLowerCase()}`])
+      view.unmount()
+      resetCatalogCache()
+    }
   })
 })
 
@@ -384,10 +374,28 @@ describe('Redo onboarding (the full flow)', () => {
     const heading = await redo()
     expect(heading).toHaveFocus()
     expect(
-      screen.queryByRole('button', { name: 'Read a short story now' }),
+      screen.queryByRole('button', { name: 'Surprise me' }),
     ).not.toBeInTheDocument()
     click('Back')
     expect(await screen.findByText('SETTINGS')).toBeInTheDocument()
+  })
+
+  it('has 12 labelled toggle buttons, Next disabled below 2 moods, and at most 5', async () => {
+    await redo()
+    const tiles = within(screen.getByRole('group')).getAllByRole('button')
+    expect(tiles).toHaveLength(12)
+    for (const tile of tiles)
+      expect(tile).toHaveAttribute('aria-pressed', 'false')
+    const next = screen.getByRole('button', { name: 'Next' })
+    expect(next).toBeDisabled()
+    expect(next).toHaveAttribute('aria-describedby', 'mood-hint')
+    expect(screen.getByText(/Pick at least 2 moods/)).toBeInTheDocument()
+    click('Eerie')
+    click('Cozy')
+    expect(next).toBeEnabled()
+    expect(screen.getByRole('status')).toHaveTextContent('2 of 5 picked')
+    for (const m of ['Funny', 'Romantic', 'Tense']) click(m)
+    expect(screen.getByRole('button', { name: 'Dark' })).toBeDisabled()
   })
 
   it('goes on to the taste cards and the reading context, then the shortlist', async () => {
@@ -491,9 +499,7 @@ describe('the fall artwork on the welcome page', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       'Free classics, picked for you.',
     )
-    expect(
-      screen.getByRole('button', { name: 'Read a short story now' }),
-    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Surprise me' })).toBeEnabled()
     expect(screen.queryByTestId('season-scene')).toBeNull()
     expect(screen.queryByTestId('season-leaves')).toBeNull()
   })
@@ -516,12 +522,8 @@ describe('the welcome preview (/welcome?preview=1)', () => {
       'Preview of the welcome screen. Nothing is saved.',
     )
     // The buttons do nothing in a preview.
-    expect(
-      screen.getByRole('button', { name: 'Turn over a new leaf' }),
-    ).toBeDisabled()
-    expect(
-      screen.getByRole('button', { name: 'Pick my moods first' }),
-    ).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Surprise me' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Eerie' })).toBeDisabled()
     expect(
       JSON.stringify({
         events: stores.events,

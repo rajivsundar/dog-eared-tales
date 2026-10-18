@@ -3,22 +3,23 @@ import type { RefObject } from 'react'
 import type { SeasonArt } from '../../app/seasonArt/types'
 import type { WelcomeView } from './featuredStory'
 import { minutesLabel } from '../detail/labels'
+import { FIRST_RUN_MOODS } from './moods'
 
 interface Props {
   view: WelcomeView
   /** The `h1` gets focus when the page opens. */
   headingRef: RefObject<HTMLHeadingElement | null>
   busy: boolean
+  /** "Surprise me": open the featured short story. */
   onReadNow: () => void
-  onPickMoods: () => void
+  /** One tap on a mood builds the first Your Shortlist. */
+  onPickMood: (id: string) => void
   /** The season's drawings, once loaded. Nothing is drawn without a season. */
   art?: SeasonArt | null
 }
 
-const primary =
-  'inline-flex min-h-11 items-center justify-center rounded-full bg-accent px-6 text-base font-semibold text-accent-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50'
-const secondary =
-  'inline-flex min-h-11 items-center justify-center rounded-full border border-line px-5 text-base font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
+const surprise =
+  'inline-flex min-h-11 items-center justify-center px-3 text-sm text-muted underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50'
 
 /** The tilt of each cover in the fan, left to right. */
 const FAN = [
@@ -33,7 +34,7 @@ export function WelcomeHero({
   headingRef,
   busy,
   onReadNow,
-  onPickMoods,
+  onPickMood,
   art = null,
 }: Props) {
   const { content, featured, covers } = view
@@ -91,29 +92,46 @@ export function WelcomeHero({
         </h1>
         <p className="mt-3 text-lg text-muted">{content.subline}</p>
 
-        <div className="mt-6 flex flex-col items-stretch gap-3 sm:flex-row sm:justify-center lg:justify-start">
+        <p id="first-mood-title" className="mt-6 text-lg font-semibold">
+          What are you in the mood for?
+        </p>
+        <div
+          role="group"
+          aria-labelledby="first-mood-title"
+          className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3"
+        >
+          {FIRST_RUN_MOODS.map((mood) => (
+            <button
+              key={mood.id}
+              type="button"
+              disabled={busy}
+              onClick={() => onPickMood(mood.id)}
+              className="flex min-h-14 items-center gap-3 rounded-card border-2 border-line bg-surface px-3 text-left text-base focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <span
+                aria-hidden="true"
+                className="size-6 shrink-0 rounded-full border border-ink/20"
+                style={{ background: mood.color }}
+              />
+              <span className="flex-1">{mood.label}</span>
+            </button>
+          ))}
+        </div>
+        <div className="mt-2 sm:text-center lg:text-left">
           <button
             type="button"
-            className={primary}
+            className={surprise}
             disabled={busy || !featured}
             onClick={onReadNow}
           >
-            {content.primaryButton}
+            Surprise me
           </button>
-          <button
-            type="button"
-            className={secondary}
-            disabled={busy}
-            onClick={onPickMoods}
-          >
-            Pick my moods first
-          </button>
+          {featured && (
+            <span data-testid="featured-story" className="hidden">
+              {featured.title} · {minutesLabel(featured.readingMinutes)}
+            </span>
+          )}
         </div>
-        {featured && (
-          <p data-testid="featured-story" className="mt-2 text-sm text-muted">
-            {featured.title} · {minutesLabel(featured.readingMinutes)}
-          </p>
-        )}
 
         <p className="mt-6 text-sm">
           Free · No account · No ads · Your reading stays on your phone

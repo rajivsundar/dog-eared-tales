@@ -21,8 +21,8 @@ const secondary =
 
 /**
  * Onboarding at /welcome.
- * First run: the welcome page, then either "Read a short story now" (straight into the reader) or
- * the mood board and Your Shortlist.
+ * First run: the welcome page. One tap on a mood builds Your Shortlist; "Surprise me" goes straight
+ * into the reader with the featured short story.
  * "Redo onboarding" (/welcome?redo=1, from Settings) runs the full flow: moods, taste cards and
  * reading context.
  */
@@ -90,7 +90,7 @@ export default function OnboardingScreen() {
     setFailed(true)
   }
 
-  /** "Read a short story now": an empty profile (so this page never returns), then the reader. */
+  /** "Surprise me": an empty profile (so this page never returns), then the reader. */
   const readNow = (): void => {
     if (!view.featured || busy) return
     setBusy(true)
@@ -172,9 +172,9 @@ export default function OnboardingScreen() {
           view={view}
           art={art}
           headingRef={headingRef}
-          busy={busy || preview}
+          busy={busy || preview || !catalog}
           onReadNow={readNow}
-          onPickMoods={() => setStep('mood')}
+          onPickMood={(id) => finish({ moods: [id], cards: {} })}
         />
       )}
 
@@ -222,9 +222,7 @@ export default function OnboardingScreen() {
             <button
               type="button"
               className={secondary}
-              onClick={() =>
-                full ? navigate('/settings') : setStep('welcome')
-              }
+              onClick={() => navigate('/settings')}
             >
               Back
             </button>
@@ -235,19 +233,15 @@ export default function OnboardingScreen() {
               aria-describedby={
                 moods.length < MIN_MOODS ? 'mood-hint' : undefined
               }
-              onClick={() =>
-                full ? goToCards(moods) : finish({ moods, cards: {} })
-              }
+              onClick={() => goToCards(moods)}
             >
-              {full ? 'Next' : 'Show my shortlist'}
+              Next
             </button>
             <button
               type="button"
               className={secondary}
               disabled={!catalog || busy}
-              onClick={() =>
-                full ? goToCards([]) : finish({ moods: [], cards: {} })
-              }
+              onClick={() => goToCards([])}
             >
               Skip
             </button>

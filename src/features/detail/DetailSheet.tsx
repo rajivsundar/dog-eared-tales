@@ -195,7 +195,13 @@ export function DetailSheet({
             onClick={onDogEar}
             className={`${buttonBase} border border-line ${dogEared ? 'bg-line/40' : ''}`}
           >
-            {dogEared ? 'Dog-eared' : 'Dog-ear'}
+            {dogEared ? (
+              <>
+                Dog-eared <span aria-hidden="true">✓</span>
+              </>
+            ) : (
+              'Dog-ear'
+            )}
           </button>
           <button
             type="button"

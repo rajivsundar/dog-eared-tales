@@ -60,7 +60,7 @@ export async function waitForReader(page: Page): Promise<void> {
 
 /**
  * Opens the app as a returning reader. A fresh browser starts onboarding, so this skips it
- * (Pick my moods first, then Skip) and waits for Your Shortlist.
+ * (one tap on a mood) and waits for Your Shortlist.
  */
 export async function startApp(
   page: Page,
@@ -70,14 +70,13 @@ export async function startApp(
   await mapProfileDb(page)
   if (date !== 'keep') await page.clock.setFixedTime(date)
   await page.goto('/')
-  const welcome = page.getByRole('button', { name: 'Pick my moods first' })
+  const welcome = page.getByRole('button', { name: 'Eerie' })
   const cards = page
     .getByRole('region', { name: /Shortlist/ })
     .getByRole('listitem')
   await expect(welcome.or(cards.first())).toBeVisible()
   if (await welcome.isVisible()) {
     await welcome.click()
-    await page.getByRole('button', { name: 'Skip', exact: true }).click()
   }
   await expect(cards).toHaveCount(6)
 }
@@ -109,4 +108,33 @@ export async function mapProfileDb(page: Page): Promise<void> {
       return request as unknown as IDBOpenDBRequest
     }
   })
+}
+
+/** Reads every record in one of the app's IndexedDB stores. */
+export function readStore(
+  page: Page,
+  store: 'events' | 'settings' | 'profile',
+): Promise<Record<string, unknown>[]> {
+  return page.evaluate(
+    (name) =>
+      new Promise<Record<string, unknown>[]>((resolve, reject) => {
+        const open = indexedDB.open('profile-db')
+        open.onerror = () => reject(open.error)
+        open.onsuccess = () => {
+          const db = open.result
+          if (!db.objectStoreNames.contains(name)) {
+            db.close()
+            resolve([])
+            return
+          }
+          const all = db.transaction(name).objectStore(name).getAll()
+          all.onsuccess = () => {
+            db.close()
+            resolve(all.result)
+          }
+          all.onerror = () => reject(all.error)
+        }
+      }),
+    store,
+  )
 }

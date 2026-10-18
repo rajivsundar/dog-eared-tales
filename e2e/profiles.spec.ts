@@ -31,8 +31,7 @@ async function addProfile(page: Page, name: string) {
   await form.getByLabel('Name').fill(name)
   await form.getByRole('button', { name: 'Add profile' }).click()
   // The new profile starts with the welcome and onboarding.
-  await page.getByRole('button', { name: 'Pick my moods first' }).click()
-  await page.getByRole('button', { name: 'Skip', exact: true }).click()
+  await page.getByRole('button', { name: 'Eerie' }).click()
   await expect(page.getByRole('listitem')).toHaveCount(6)
 }
 

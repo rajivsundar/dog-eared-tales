@@ -32,6 +32,7 @@ test('a dog-eared story moves to Reading after two pages, with minutes left', as
     .getByRole('link', { name: 'Library' })
     .click()
   await expect(page).toHaveURL(/\/library/)
+  await page.getByRole('tab', { name: /Reading/ }).click()
   await expect(page.getByText(/Nothing in progress yet/)).toBeVisible()
   await page.getByRole('tab', { name: /Kept/ }).click()
   const entry = page.getByRole('link', { name: new RegExp(title) })

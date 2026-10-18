@@ -219,9 +219,9 @@ describe('detail sheet', () => {
     const saves = stores.events.filter((e) => e.type === 'save')
     expect(saves).toHaveLength(1)
     expect(stores.library.has(saves[0].workId)).toBe(true)
-    expect(
-      within(sheet).getByRole('button', { name: 'Dog-eared' }),
-    ).toBeEnabled()
+    const done = within(sheet).getByRole('button', { name: 'Dog-eared' })
+    expect(done).toBeEnabled()
+    expect(done).toHaveTextContent('Dog-eared ✓')
   })
 
   it('tapping Dog-eared again un-dog-ears it, with Removed · Undo', async () => {

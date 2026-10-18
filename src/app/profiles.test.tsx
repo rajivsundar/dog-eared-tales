@@ -343,7 +343,7 @@ describe('Settings → Profiles', () => {
     expect(stores.profileManager.current().active?.color).toBe('ocean')
     // The fake event log is shared, so the gate is not what sends us; the add flow goes to /welcome.
     expect(
-      await screen.findByRole('button', { name: 'Pick my moods first' }),
+      await screen.findByRole('button', { name: 'Surprise me' }),
     ).toBeInTheDocument()
   })
 

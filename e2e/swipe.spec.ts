@@ -1,5 +1,5 @@
 import { type Page, devices, expect, test } from '@playwright/test'
-import { mapProfileDb } from './helpers'
+import { mapProfileDb, readStore } from './helpers'
 
 // A Pixel-sized touch phone (412 x 915).
 test.use({ ...devices['Pixel 7'] })
@@ -112,6 +112,14 @@ test('the first-time hint shows once, and not again after it is dismissed', asyn
   await expect(hint).toContainText('Tap the edges or swipe to turn pages.')
   await page.getByRole('button', { name: 'Got it' }).click()
   await expect(hint).toHaveCount(0)
+  // The choice is saved a moment after the note goes away; reload only once it is.
+  await expect
+    .poll(async () =>
+      (await readStore(page, 'settings')).some(
+        (s) => s.readerHintSeen === true,
+      ),
+    )
+    .toBe(true)
 
   await page.reload()
   await expect(page.getByTestId('reader')).toHaveAttribute(

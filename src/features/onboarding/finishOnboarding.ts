@@ -44,7 +44,7 @@ export async function isFirstRun(
 }
 
 /**
- * "Read a short story now": saves an empty profile, so the welcome page never shows again. The
+ * "Surprise me": saves an empty profile, so the welcome page never shows again. The
  * reader's first rating (the check-in after the story) seeds the profile from there.
  */
 export async function startWithStory(

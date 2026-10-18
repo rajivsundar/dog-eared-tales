@@ -18,8 +18,8 @@ import { UndoToast } from '../ui/UndoToast'
 import { type LibraryLists, sortLibrary } from './libraryLists'
 
 const TABS = [
-  { id: 'reading', label: 'Reading' },
   { id: 'dog-eared', label: 'Kept' },
+  { id: 'reading', label: 'Reading' },
   { id: 'finished', label: 'Finished' },
 ] as const
 type TabId = (typeof TABS)[number]['id']
@@ -48,11 +48,11 @@ interface Removed {
   saved: SavedWork
 }
 
-/** The Library at /library: Reading, Dog-eared and Finished. */
+/** The Library at /library: Kept, Reading and Finished. */
 export default function LibraryScreen() {
   const [params, setParams] = useSearchParams()
   const tab: TabId =
-    TABS.find((t) => t.id === params.get('tab'))?.id ?? 'reading'
+    TABS.find((t) => t.id === params.get('tab'))?.id ?? 'dog-eared'
 
   const [lists, setLists] = useState<LibraryLists | null>(null)
   const [failed, setFailed] = useState(false)

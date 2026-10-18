@@ -1,35 +1,6 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { mapProfileDb, readToEnd, startApp } from './helpers'
-
-/** Reads every record in one of the app's IndexedDB stores. */
-function readStore(
-  page: Page,
-  store: 'events' | 'settings' | 'profile',
-): Promise<Record<string, unknown>[]> {
-  return page.evaluate(
-    (name) =>
-      new Promise<Record<string, unknown>[]>((resolve, reject) => {
-        const open = indexedDB.open('profile-db')
-        open.onerror = () => reject(open.error)
-        open.onsuccess = () => {
-          const db = open.result
-          if (!db.objectStoreNames.contains(name)) {
-            db.close()
-            resolve([])
-            return
-          }
-          const all = db.transaction(name).objectStore(name).getAll()
-          all.onsuccess = () => {
-            db.close()
-            resolve(all.result)
-          }
-          all.onerror = () => reject(all.error)
-        }
-      }),
-    store,
-  )
-}
+import { mapProfileDb, readStore, readToEnd, startApp } from './helpers'
 
 /** Onboarding events in time order (getAll() returns them by id). */
 async function onboardReasons(page: Page): Promise<unknown[]> {
@@ -79,8 +50,20 @@ test.describe('the welcome page', () => {
       ).toBeGreaterThan(0)
     }
 
+    await expect(page.getByText('What are you in the mood for?')).toBeVisible()
+    const moods = page
+      .getByRole('group', { name: 'What are you in the mood for?' })
+      .getByRole('button')
+    await expect(moods).toHaveText([
+      'Funny',
+      'Eerie',
+      'Tense',
+      'Thoughtful',
+      'Adventurous',
+      'Hopeful',
+    ])
     await expect(
-      page.getByRole('button', { name: 'Read a short story now' }),
+      page.getByRole('button', { name: 'Surprise me' }),
     ).toBeVisible()
     await expect(page.getByTestId('featured-story')).toHaveText(
       'The Open Window · 5 min',
@@ -141,7 +124,7 @@ test.describe('the welcome page', () => {
       page.getByText('Great free stories, picked for you. Start short.'),
     ).toBeVisible()
     await expect(
-      page.getByRole('button', { name: 'Turn over a new leaf' }),
+      page.getByRole('button', { name: 'Surprise me' }),
     ).toBeVisible()
     await expect(page.getByTestId('featured-story')).toContainText(
       'The Tell-Tale Heart',
@@ -164,17 +147,17 @@ test.describe('the welcome page', () => {
       'Free classics, picked for you.',
     )
     await expect(
-      page.getByRole('button', { name: 'Read a short story now' }),
+      page.getByRole('button', { name: 'Surprise me' }),
     ).toBeVisible()
   })
 })
 
-test('"Read a short story now": read the story, rate it, land on Your Shortlist, then tune', async ({
+test('"Surprise me": read the story, rate it, land on Your Shortlist, then tune', async ({
   page,
 }) => {
   await page.clock.setFixedTime(MARCH)
   await page.goto('/')
-  await page.getByRole('button', { name: 'Read a short story now' }).click()
+  await page.getByRole('button', { name: 'Surprise me' }).click()
 
   // Straight into the reader, with a profile saved so the welcome never returns.
   await expect(page).toHaveURL(/\/read\/pg-269-the-open-window$/)
@@ -274,61 +257,25 @@ test('the Tune card can be dismissed, and stays dismissed after a reload', async
   ).toHaveCount(0)
 })
 
-test('"Pick my moods first": moods, then Your Shortlist, with no taste cards', async ({
+test('one tap on a mood goes straight to Your Shortlist, with no taste cards', async ({
   page,
 }) => {
   await page.clock.setFixedTime(MARCH) // out of season: no seasonal row
   await page.goto('/')
-  await page.getByRole('button', { name: 'Pick my moods first' }).click()
-
-  await expect(
-    page.getByRole('heading', { name: /in the mood for/ }),
-  ).toBeFocused()
-  const tiles = page.getByRole('group').getByRole('button')
-  await expect(tiles).toHaveCount(12)
-  const next = page.getByRole('button', { name: 'Show my shortlist' })
-  await expect(next).toBeDisabled()
-  await expect(page.getByText(/Pick at least 2 moods/)).toBeVisible()
   await page.getByRole('button', { name: 'Eerie' }).click()
-  // Keyboard: focus a tile and press Space.
-  await page.getByRole('button', { name: 'Cozy' }).focus()
-  await page.keyboard.press('Space')
-  await expect(page.getByRole('button', { name: 'Cozy' })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  )
-  await expect(next).toBeEnabled()
-  await expect(page.getByRole('button', { name: 'Skip setup' })).toHaveCount(0)
-  await next.click()
 
   await expect(page).toHaveURL(/\/$/)
   await expect(page.getByRole('listitem')).toHaveCount(6)
   await expect(
     page.getByRole('heading', { name: /catch your eye/ }),
   ).toHaveCount(0)
-  expect(await onboardReasons(page)).toEqual([
-    'start',
-    'mood:eerie',
-    'mood:cozy',
-  ])
+  expect(await onboardReasons(page)).toEqual(['start', 'mood:eerie'])
   expect(await readStore(page, 'profile')).toHaveLength(1)
 
   // Coming back later does not show the welcome again.
   await page.goto('/')
   await expect(page.getByRole('listitem')).toHaveCount(6)
   await expect(page).toHaveURL(/\/$/)
-})
-
-test('Skip on the mood board goes straight to the starter mix', async ({
-  page,
-}) => {
-  await page.clock.setFixedTime(MARCH) // out of season: no seasonal row
-  await page.goto('/')
-  await page.getByRole('button', { name: 'Pick my moods first' }).click()
-  await page.getByRole('button', { name: 'Skip', exact: true }).click()
-  await expect(page).toHaveURL(/\/$/)
-  await expect(page.getByRole('listitem')).toHaveCount(6)
-  expect(await onboardReasons(page)).toEqual(['start'])
 })
 
 test('Redo onboarding in Settings runs the full flow and keeps reading history', async ({

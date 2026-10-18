@@ -95,14 +95,25 @@ describe('empty states', () => {
 })
 
 describe('tabs', () => {
-  it('starts on Reading and shows a story with a progress bar and minutes left', async () => {
+  it('lists the tabs as Kept, Reading, Finished and starts on Kept', async () => {
+    renderLibrary()
+    await screen.findByText(/Nothing kept yet/)
+    expect(
+      screen
+        .getAllByRole('tab')
+        .map((t) => t.textContent?.replace(/\(\d+\)$/, '')),
+    ).toEqual(['Kept', 'Reading', 'Finished'])
+    expect(tab('Kept')).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('shows a story on Reading with a progress bar and minutes left', async () => {
     await stores.progressStore.set({
       workId: 'story-3',
       locator: 'x',
       percent: 50,
       secondsRead: 10,
     })
-    renderLibrary()
+    renderLibrary('/library?tab=reading')
     expect(await screen.findByText('Story 3')).toBeInTheDocument()
     expect(tab('Reading')).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByText('5 min left')).toBeInTheDocument()
@@ -119,10 +130,12 @@ describe('tabs', () => {
   it('switches tabs and with the arrow keys', async () => {
     await stores.libraryStore.save('story-4')
     renderLibrary()
-    await screen.findByText(/Nothing in progress yet/)
-    fireEvent.keyDown(tab('Reading'), { key: 'ArrowRight' })
-    expect(await screen.findByText('Story 4')).toBeInTheDocument()
-    expect(tab('Kept')).toHaveAttribute('aria-selected', 'true')
+    await screen.findByText('Story 4')
+    fireEvent.keyDown(tab('Kept'), { key: 'ArrowRight' })
+    expect(
+      await screen.findByText(/Nothing in progress yet/),
+    ).toBeInTheDocument()
+    expect(tab('Reading')).toHaveAttribute('aria-selected', 'true')
   })
 
   it('shows the finish date on Finished', async () => {
@@ -140,9 +153,11 @@ describe('tabs', () => {
     await stores.libraryStore.save('story-1')
     await stores.eventLog.append({ workId: 'story-1', type: 'open' })
     renderLibrary()
-    await screen.findByText(/Nothing in progress yet/)
-    fireEvent.click(tab('Kept'))
     expect(await screen.findByText('Story 1')).toBeInTheDocument()
+    fireEvent.click(tab('Reading'))
+    expect(
+      await screen.findByText(/Nothing in progress yet/),
+    ).toBeInTheDocument()
   })
 
   it('moves a dog-eared work to Reading after a page is turned', async () => {
@@ -154,9 +169,9 @@ describe('tabs', () => {
       secondsRead: 30,
     })
     renderLibrary()
-    expect(await screen.findByText('Story 1')).toBeInTheDocument()
-    fireEvent.click(tab('Kept'))
     expect(await screen.findByText(/Nothing kept yet/)).toBeInTheDocument()
+    fireEvent.click(tab('Reading'))
+    expect(await screen.findByText('Story 1')).toBeInTheDocument()
   })
 })
 
@@ -340,7 +355,7 @@ describe('offline icons in the Library', () => {
     })
 
     // Reading: story-2 is not stored.
-    renderLibrary()
+    renderLibrary('/library?tab=reading')
     const reading = await screen.findByText('Story 2')
     expect(icons(reading.closest('li')!)).toHaveLength(0)
 

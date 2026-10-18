@@ -257,7 +257,7 @@ describe('reading context', () => {
   })
 })
 
-describe('"Read a short story now" (startWithStory)', () => {
+describe('"Surprise me" (startWithStory)', () => {
   it('saves an empty profile and nothing else, so the welcome never shows again', async () => {
     const { s, deps } = setup()
     expect(await isFirstRun(deps)).toBe(true)
@@ -318,7 +318,7 @@ describe('"Tune your picks" (tuneTaste)', () => {
     expect(netWeight(profile.facetBeliefs, 'mood:funny')).toBeCloseTo(1.5, 2)
   })
 
-  it('works after "Read a short story now", where there was no start marker', async () => {
+  it('works after "Surprise me", where there was no start marker', async () => {
     const { s, deps } = setup()
     await startWithStory(deps)
     await tuneTaste(deps, { 'story-2': 'love' }, TODAY)

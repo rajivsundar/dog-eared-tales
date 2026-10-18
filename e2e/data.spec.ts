@@ -87,9 +87,7 @@ test('export, delete everything, then import brings the data back', async ({
   await page.getByLabel(/Type DELETE/).fill('DELETE')
   await confirm.click()
   await expect(page).toHaveURL(/\/welcome$/)
-  await expect(
-    page.getByRole('button', { name: 'Pick my moods first' }),
-  ).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Surprise me' })).toBeVisible()
   expect(await readEvents(page)).toEqual([])
 
   // Import it back, after confirming.
