@@ -2,6 +2,7 @@ node_modules
 dist
 .env*
 !.env.example
+tools/story-guide/cache/
 playwright-report
 test-results
 public/catalog/

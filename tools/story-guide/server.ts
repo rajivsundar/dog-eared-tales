@@ -11,6 +11,16 @@ import express from 'express'
 import { MOODS, buildCatalog } from '../../scripts/build-catalog.ts'
 import type { CatalogEntry } from '../../scripts/build-catalog.ts'
 import {
+  GutenbergError,
+  MAX_ANALYSED_WORDS,
+  capWords,
+  findBook,
+  gutenbergPage,
+  loadBookText,
+  searchGutendex,
+  trimGutenbergText,
+} from './gutenberg.ts'
+import {
   AGE_REASON_MAX_WORDS,
   BLURB_MAX_WORDS,
   HOOK_MAX_WORDS,
@@ -129,6 +139,67 @@ app.get('/api/stories', (_req, res) => {
   )
 })
 
+/** Project Gutenberg search, through Gutendex. The browser never calls Gutendex itself. */
+app.get('/api/gutenberg/search', async (req, res) => {
+  const q = typeof req.query.q === 'string' ? req.query.q.trim() : ''
+  if (!q) {
+    res.status(400).json({ error: 'Type something to search for.' })
+    return
+  }
+  try {
+    res.json(await searchGutendex(q))
+  } catch (error) {
+    sendGutenbergError(res, error)
+  }
+})
+
+/** Picks a book: downloads its text (once, then cached), trims it and counts the words. */
+app.get('/api/gutenberg/book/:id', async (req, res) => {
+  const id = Number(req.params.id)
+  if (!Number.isInteger(id) || id <= 0) {
+    res.status(400).json({ error: 'That is not a Gutenberg id.' })
+    return
+  }
+  try {
+    const book = await findBook(id)
+    const text = trimGutenbergText(await loadBookText(book))
+    const { analysedWords, totalWords, truncated } = capWords(
+      text,
+      MAX_ANALYSED_WORDS,
+    )
+    res.json({
+      id,
+      title: book.title,
+      author: book.author,
+      url: gutenbergPage(id),
+      totalWords,
+      analysedWords,
+      truncated,
+      limit: MAX_ANALYSED_WORDS,
+      inCatalog: catalogTitlesFrom(id),
+    })
+  } catch (error) {
+    sendGutenbergError(res, error)
+  }
+})
+
+/** Titles in the Dog-Eared Tales catalog that come from this Gutenberg book (empty: none). */
+const catalogTitlesFrom = (gutenbergId: number): string[] =>
+  entries
+    .filter((e) => e.id.startsWith(`pg-${gutenbergId}-`))
+    .map((e) => e.title)
+
+function sendGutenbergError(res: express.Response, error: unknown): void {
+  const message = error instanceof Error ? error.message : String(error)
+  console.error(`story-guide: ${message}`)
+  res.status(error instanceof GutenbergError ? 502 : 500).json({
+    error:
+      error instanceof GutenbergError
+        ? message
+        : 'Something went wrong on the server. See the terminal.',
+  })
+}
+
 app.post('/analyze', async (req, res) => {
   if (!apiKey()) {
     res.status(503).json({
@@ -139,16 +210,31 @@ app.post('/analyze', async (req, res) => {
   }
   const {
     id,
+    gutenbergId,
     text: pasted,
     title,
   } = (req.body ?? {}) as {
     id?: unknown
+    gutenbergId?: unknown
     text?: unknown
     title?: unknown
   }
 
   let story = ''
   let curated: CatalogEntry | undefined
+  let gutenberg:
+    | {
+        id: number
+        title: string
+        author: string
+        url: string
+        totalWords: number
+        analysedWords: number
+        truncated: boolean
+        limit: number
+        inCatalog: string[]
+      }
+    | undefined
   let label =
     typeof title === 'string' && title.trim() ? title.trim() : 'Pasted text'
   if (typeof id === 'string' && id) {
@@ -159,6 +245,35 @@ app.post('/analyze', async (req, res) => {
     }
     story = rangeText[id]
     label = `${curated.title}, ${curated.author}`
+  } else if (gutenbergId !== undefined && gutenbergId !== null) {
+    const number = Number(gutenbergId)
+    if (!Number.isInteger(number) || number <= 0) {
+      res.status(400).json({ error: 'That is not a Gutenberg id.' })
+      return
+    }
+    try {
+      const book = await findBook(number)
+      const trimmed = trimGutenbergText(await loadBookText(book))
+      // The full-story call reads at most the first 20,000 words; the blurb call then uses
+      // the first third of what is read.
+      const capped = capWords(trimmed, MAX_ANALYSED_WORDS)
+      story = capped.text
+      label = `${book.title}, ${book.author}`
+      gutenberg = {
+        id: number,
+        title: book.title,
+        author: book.author,
+        url: gutenbergPage(number),
+        totalWords: capped.totalWords,
+        analysedWords: capped.analysedWords,
+        truncated: capped.truncated,
+        limit: MAX_ANALYSED_WORDS,
+        inCatalog: catalogTitlesFrom(number),
+      }
+    } catch (error) {
+      sendGutenbergError(res, error)
+      return
+    }
   } else if (typeof pasted === 'string') {
     story = pasted.trim()
   }
@@ -196,6 +311,9 @@ app.post('/analyze', async (req, res) => {
           limit: AGE_REASON_MAX_WORDS,
         },
       },
+      source: gutenberg
+        ? { kind: 'gutenberg', ...gutenberg }
+        : { kind: curated ? 'catalog' : 'pasted' },
       curated: curated && {
         hook: curated.hook,
         blurb: curated.blurb,

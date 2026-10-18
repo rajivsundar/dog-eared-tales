@@ -149,6 +149,44 @@
         padding: 0.15rem 0.5rem 0.15rem 0;
         border-bottom: 1px solid var(--line);
       }
+      .row {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+      }
+      button.small {
+        margin-top: 0;
+        white-space: nowrap;
+      }
+      .gresults {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .gresults li {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--line);
+        padding: 0.35rem 0;
+      }
+      .gresults button {
+        margin: 0;
+        padding: 0.3rem 1rem;
+      }
+      .picked {
+        border: 2px solid var(--accent);
+        border-radius: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        margin: 0.5rem 0;
+      }
+      .picked p {
+        margin: 0.25rem 0;
+      }
+      a {
+        color: var(--accent);
+      }
       td.reason {
         font-size: 0.9rem;
         padding: 0 0 0.35rem 1rem;
@@ -174,6 +212,19 @@
         <label for="story">Catalog story</label>
         <select id="story"></select>
         <p class="muted" id="count"></p>
+
+        <label for="gsearch">Or search Project Gutenberg</label>
+        <div class="row">
+          <input
+            id="gsearch"
+            type="search"
+            placeholder="Title or author, e.g. The Open Window"
+          />
+          <button id="gsearch-go" type="button" class="small">Search</button>
+        </div>
+        <p id="gstatus" role="status" class="muted"></p>
+        <ul id="gresults" class="gresults"></ul>
+        <div id="gpicked" class="picked" hidden></div>
 
         <label for="pasted">Or paste a story (at least 150 words)</label>
         <textarea
@@ -414,7 +465,14 @@
                   ),
                 ),
               )
-            : text('Pasted text has no curated version.', 'muted'),
+            : r.source && r.source.kind === 'gutenberg'
+              ? text(
+                  r.source.inCatalog.length
+                    ? inCatalogNote(r.source.inCatalog)
+                    : 'Not in the Dog-Eared Tales catalog',
+                  'muted',
+                )
+              : text('Pasted text has no curated version.', 'muted'),
         )
         const checks = el(
           'section',
@@ -431,9 +489,149 @@
         )
         out.replaceChildren(
           el('h2', { textContent: r.label }),
+          ...(r.source && r.source.kind === 'gutenberg'
+            ? [
+                el(
+                  'p',
+                  {},
+                  el('span', {
+                    textContent:
+                      'Project Gutenberg: ' +
+                      r.source.title +
+                      ' by ' +
+                      r.source.author +
+                      '. ',
+                  }),
+                  gutenbergLink(r.source.id),
+                ),
+                r.source.truncated
+                  ? text(
+                      'Only the first ' +
+                        r.source.limit.toLocaleString() +
+                        ' of ' +
+                        r.source.totalWords.toLocaleString() +
+                        ' words were analysed; the blurb uses the first third of those.',
+                      'bad',
+                    )
+                  : el('span'),
+              ]
+            : []),
           el('div', { className: 'cols' }, gemmaCol, curatedCol),
           checks,
         )
+      }
+
+      // Project Gutenberg: the page only talks to this server, never to Gutendex or Gutenberg.
+      let gutenbergPick = null
+      const gutenbergLink = (id) =>
+        el('a', {
+          href: 'https://www.gutenberg.org/ebooks/' + Number(id),
+          target: '_blank',
+          rel: 'noopener noreferrer',
+          textContent: 'View on Project Gutenberg',
+        })
+      const limitNote = (b) =>
+        'This book has ' +
+        b.totalWords.toLocaleString() +
+        ' words. Only the first ' +
+        b.limit.toLocaleString() +
+        ' words will be analysed; the blurb is written from the first third of those.'
+
+      const inCatalogNote = (titles) =>
+        'This book is already in the Dog-Eared Tales catalog (' +
+        titles.slice(0, 3).join(', ') +
+        (titles.length > 3 ? ', …' : '') +
+        '). Pick it from the catalog list to compare with the curated version.'
+
+      function clearPick() {
+        gutenbergPick = null
+        $('gpicked').hidden = true
+        $('gpicked').replaceChildren()
+      }
+
+      async function searchGutenberg() {
+        const q = $('gsearch').value.trim()
+        const status = $('gstatus')
+        status.className = 'muted'
+        if (!q) return
+        $('gresults').replaceChildren()
+        status.textContent = 'Searching Project Gutenberg…'
+        try {
+          const response = await fetch(
+            '/api/gutenberg/search?q=' + encodeURIComponent(q),
+          )
+          const data = await response.json()
+          if (!response.ok) throw new Error(data.error || 'Search failed.')
+          status.textContent = data.length
+            ? ''
+            : 'No matches on Project Gutenberg.'
+          $('gresults').replaceChildren(
+            ...data.map((b) =>
+              el(
+                'li',
+                {},
+                el('span', {
+                  textContent:
+                    b.title +
+                    ' — ' +
+                    b.author +
+                    ' · #' +
+                    b.id +
+                    ' · ' +
+                    b.downloads.toLocaleString() +
+                    ' downloads',
+                }),
+                el('button', {
+                  type: 'button',
+                  textContent: 'Use',
+                  onclick: () => pickBook(b),
+                }),
+              ),
+            ),
+          )
+        } catch (error) {
+          status.className = 'bad'
+          status.textContent = error.message
+        }
+      }
+
+      async function pickBook(b) {
+        const status = $('gstatus')
+        status.className = 'muted'
+        status.textContent = 'Downloading “' + b.title + '”…'
+        try {
+          const response = await fetch('/api/gutenberg/book/' + Number(b.id))
+          const data = await response.json()
+          if (!response.ok) throw new Error(data.error || 'Download failed.')
+          status.textContent = ''
+          gutenbergPick = data
+          $('story').value = ''
+          $('pasted').value = ''
+          const box = $('gpicked')
+          box.replaceChildren(
+            el('p', {
+              textContent:
+                'Selected: ' +
+                data.title +
+                ' — ' +
+                data.author +
+                ' · ' +
+                data.totalWords.toLocaleString() +
+                ' words',
+            }),
+            el('p', {}, gutenbergLink(data.id)),
+            data.inCatalog.length
+              ? text(inCatalogNote(data.inCatalog), 'muted')
+              : el('span'),
+            data.truncated
+              ? el('p', { className: 'bad', textContent: limitNote(data) })
+              : el('span'),
+          )
+          box.hidden = false
+        } catch (error) {
+          status.className = 'bad'
+          status.textContent = error.message
+        }
       }
 
       async function analyze() {
@@ -445,9 +643,11 @@
           'Asking Gemma (two calls, this can take a minute)…'
         $('results').replaceChildren()
         try {
-          const body = id
-            ? { id }
-            : { text: pasted, title: $('pasted-title').value }
+          const body = gutenbergPick
+            ? { gutenbergId: gutenbergPick.id }
+            : id
+              ? { id }
+              : { text: pasted, title: $('pasted-title').value }
           const response = await fetch('/analyze', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -472,7 +672,16 @@
         }
       }
 
-      $('search').addEventListener('input', () => fillStories())
+      $('search').addEventListener('input', () => {
+        clearPick()
+        fillStories()
+      })
+      $('story').addEventListener('change', clearPick)
+      $('pasted').addEventListener('input', clearPick)
+      $('gsearch-go').addEventListener('click', searchGutenberg)
+      $('gsearch').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') searchGutenberg()
+      })
       $('go').addEventListener('click', analyze)
       ;(async () => {
         await loadStatus()

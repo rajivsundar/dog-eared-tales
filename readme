@@ -83,6 +83,7 @@ Story Guide is a local tool in `tools/story-guide/` that never ships in the app.
 - **Labels:** from the whole story, up to 3 moods (only from the catalog's mood list), content notes with intensity (none, mild or strong) for violence, death, frightening scenes, sexual themes, period racist language and animal harm, and an age band (All ages, 10+, 13+ or 16+) with a one-sentence reason for parents.
 - **Checks:** the catalog's own banned-words and six-word-quote checks run on Gemma's hook and blurb, and any failure is shown.
 - **Story source:** any catalog story (its text comes from the same extraction as the catalog build, so ranges and trims match what readers get), or pasted text of at least 150 words.
+- **Project Gutenberg search:** search Project Gutenberg through the Gutendex API (English, public domain only) and use any of the top 10 results. The server downloads the book's plain text once, keeps it in the git-ignored `tools/story-guide/cache/`, and cuts the Gutenberg header and footer the way the catalog build does. A book over 20,000 words is analysed on its first 20,000 words only, and the page says so. Gutendex is a free service and is sometimes slow or down; the page says when it is. The browser never contacts Gutendex or Gutenberg: the server does, with a descriptive User-Agent.
 
 To run it:
 
