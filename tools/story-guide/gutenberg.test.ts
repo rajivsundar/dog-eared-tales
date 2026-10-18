@@ -3,21 +3,19 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { CatalogUnavailable } from './catalog.ts'
+import { buildIndex, CatalogUnavailable } from './catalog.ts'
 import {
   GutenbergError,
   USER_AGENT,
   capWords,
+  estimateWords,
   findBook,
+  gutenbergTextUrl,
   loadBookText,
-  pickTextUrl,
-  readableAuthor,
-  searchGutendex,
+  searchGutenberg,
   trimGutenbergText,
+  wordsFromBytes,
 } from './gutenberg.ts'
-
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status })
 
 describe('trimGutenbergText', () => {
   it('cuts the header, the footer and the licence, and drops illustration placeholders', () => {
@@ -63,72 +61,67 @@ describe('capWords', () => {
   })
 })
 
-describe('Gutendex results', () => {
-  it('prefers the UTF-8 plain text and skips zips and web pages', () => {
-    expect(
-      pickTextUrl({
-        'text/html': 'https://www.gutenberg.org/ebooks/1.html.images',
-        'text/plain; charset=us-ascii': 'https://www.gutenberg.org/a.txt',
-        'text/plain; charset=utf-8': 'https://www.gutenberg.org/u.txt',
-        'application/zip': 'https://www.gutenberg.org/z.zip',
-      }),
-    ).toBe('https://www.gutenberg.org/u.txt')
-    expect(pickTextUrl({ 'text/html': 'x' })).toBeNull()
+describe('the length estimate', () => {
+  let dir: URL
+  beforeEach(async () => {
+    dir = pathToFileURL(join(await mkdtemp(join(tmpdir(), 'sg-len-')), '/'))
+  })
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true })
   })
 
-  it('turns "Last, First" into "First Last"', () => {
-    expect(readableAuthor('Poe, Edgar Allan')).toBe('Edgar Allan Poe')
-    expect(readableAuthor('Anonymous')).toBe('Anonymous')
+  it('takes the licence text off, then counts about 6 bytes a word', () => {
+    // Four real books: file size in bytes, and the words they really have.
+    for (const [bytes, words] of [
+      [38223, 3263],
+      [39645, 3432],
+      [35146, 2740],
+      [41575, 3760],
+    ])
+      expect(Math.abs(wordsFromBytes(bytes) - words) / words).toBeLessThan(0.07)
+    expect(wordsFromBytes(500)).toBe(0)
   })
-})
 
-describe('searchGutendex', () => {
-  it('asks for English, public-domain books, sends a User-Agent, and returns the top 10', async () => {
-    const results = Array.from({ length: 14 }, (_, i) => ({
-      id: i + 1,
-      title: `Book ${i + 1}`,
-      authors: [{ name: 'Saki' }],
-      download_count: 100 - i,
-      formats: {},
-    }))
-    const fetchFn = vi.fn(async () => json({ results }))
-    const found = await searchGutendex('open window', fetchFn as typeof fetch)
-    const [url, init] = fetchFn.mock.calls[0] as unknown as [
+  it('asks for the file size with HEAD, never downloads the book, and remembers the answer', async () => {
+    const fetchFn = vi.fn(
+      async () =>
+        new Response(null, { headers: { 'content-length': '38223' } }),
+    )
+    const first = await estimateWords(
+      [23172, 1080],
+      fetchFn as typeof fetch,
+      dir,
+    )
+    expect(first.get(23172)).toBe(wordsFromBytes(38223))
+    expect(fetchFn).toHaveBeenCalledTimes(2)
+    for (const call of fetchFn.mock.calls as unknown as [
       string,
       RequestInit,
-    ]
-    expect(url).toContain('search=open+window')
-    expect(url).toContain('languages=en')
-    expect(url).toContain('copyright=false')
-    expect((init.headers as Record<string, string>)['User-Agent']).toBe(
-      USER_AGENT,
+    ][]) {
+      expect(call[1].method).toBe('HEAD')
+      // The uncompressed size is wanted: a zipped file's size would count far too few words.
+      expect(
+        (call[1].headers as Record<string, string>)['Accept-Encoding'],
+      ).toBe('identity')
+      expect((call[1].headers as Record<string, string>)['User-Agent']).toBe(
+        USER_AGENT,
+      )
+    }
+    expect(
+      (fetchFn.mock.calls as unknown as [string][]).map((c) => c[0]),
+    ).toEqual(
+      expect.arrayContaining([gutenbergTextUrl(23172), gutenbergTextUrl(1080)]),
     )
-    expect(found).toHaveLength(10)
-    expect(found[0]).toEqual({
-      id: 1,
-      title: 'Book 1',
-      author: 'Saki',
-      downloads: 100,
-    })
+    await estimateWords([23172, 1080], fetchFn as typeof fetch, dir)
+    expect(fetchFn).toHaveBeenCalledTimes(2)
   })
 
-  it('says clearly that Gutendex is down, for an error status or no answer', async () => {
-    for (const fetchFn of [
-      async () => json({}, 503),
-      async () => {
-        throw new TypeError('fetch failed')
-      },
-    ]) {
-      const failure = searchGutendex('x', fetchFn as typeof fetch)
-      await expect(failure).rejects.toBeInstanceOf(GutenbergError)
-      await expect(failure).rejects.toThrow(/not answering right now/)
-    }
+  it('gives no estimate when the size is not known', async () => {
+    const down = vi.fn(async () => new Response(null, { status: 503 }))
+    const sizes = await estimateWords([5], down as typeof fetch, dir)
+    expect(sizes.get(5)).toBeUndefined()
   })
 })
-
-const noCatalog = async () => {
-  throw new CatalogUnavailable('no catalog in this test')
-}
 
 describe('the cache', () => {
   let dir: URL
@@ -143,7 +136,6 @@ describe('the cache', () => {
     id: 84,
     title: 'Frankenstein',
     author: 'Mary Shelley',
-    downloads: 1,
     textUrl: 'https://www.gutenberg.org/cache/epub/84/pg84.txt',
   }
 
@@ -174,23 +166,73 @@ describe('the cache', () => {
     ).rejects.toThrow(/not on gutenberg.org/)
     expect(fetchFn).not.toHaveBeenCalled()
   })
+})
 
-  it('remembers a book picked earlier, so it works while Gutendex is down', async () => {
-    const up = vi.fn(async () =>
-      json({
-        id: 84,
-        title: 'Frankenstein',
-        authors: [{ name: 'Shelley, Mary' }],
-        download_count: 5,
-        formats: { 'text/plain; charset=utf-8': book.textUrl },
-      }),
+const CSV = [
+  'Text#,Type,Issued,Title,Language,Authors,Subjects,LoCC,Bookshelves',
+  '23172,Text,2007-10-24,"The Damned Thing\n1898",en,"Bierce, Ambrose, 1842-1914?",x,PS,y',
+  '2148,Text,1998-06-01,The Tell-Tale Heart,en,"Poe, Edgar Allan, 1809-1849",x,PS,y',
+].join('\n')
+const index = buildIndex(CSV)
+const noCatalog = async () => {
+  throw new CatalogUnavailable('no file')
+}
+
+describe('searchGutenberg and findBook (no Gutendex)', () => {
+  let dir: URL
+  beforeEach(async () => {
+    dir = pathToFileURL(join(await mkdtemp(join(tmpdir(), 'sg-find-')), '/'))
+  })
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true })
+  })
+
+  it('searches the local catalog and asks the network for nothing', async () => {
+    const fetchFn = vi.fn()
+    const found = await searchGutenberg(
+      'edgar allen',
+      10,
+      fetchFn as unknown as typeof fetch,
+      async () => index,
     )
-    const first = await findBook(84, up as typeof fetch, dir, noCatalog)
-    expect(first.author).toBe('Mary Shelley')
-    const down = vi.fn(async () => json({}, 503))
-    expect(await findBook(84, down as typeof fetch, dir, noCatalog)).toEqual(
-      first,
+    expect(found).toEqual([
+      { id: 2148, title: 'The Tell-Tale Heart', author: 'Edgar Allan Poe' },
+    ])
+    expect(fetchFn).not.toHaveBeenCalled()
+  })
+
+  it('says clearly what is wrong when there is no catalog file', async () => {
+    await expect(
+      searchGutenberg('x', 10, fetch, noCatalog),
+    ).rejects.toBeInstanceOf(GutenbergError)
+    await expect(searchGutenberg('x', 10, fetch, noCatalog)).rejects.toThrow(
+      /catalog file, and there is no saved copy/,
     )
-    expect(down).not.toHaveBeenCalled()
+  })
+
+  it("finds a book from the catalog with Gutenberg's standard text link, and remembers it", async () => {
+    const fetchFn = vi.fn()
+    const book = await findBook(
+      23172,
+      fetchFn as unknown as typeof fetch,
+      dir,
+      async () => index,
+    )
+    expect(book).toEqual({
+      id: 23172,
+      title: 'The Damned Thing',
+      author: 'Ambrose Bierce',
+      textUrl: 'https://www.gutenberg.org/cache/epub/23172/pg23172.txt',
+    })
+    expect(fetchFn).not.toHaveBeenCalled()
+    expect(
+      await findBook(23172, fetchFn as unknown as typeof fetch, dir, noCatalog),
+    ).toEqual(book)
+  })
+
+  it('refuses a book that is not in the English catalog', async () => {
+    await expect(
+      findBook(999999, fetch, dir, async () => index),
+    ).rejects.toThrow(/not in the English text catalog/)
   })
 })

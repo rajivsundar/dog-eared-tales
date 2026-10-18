@@ -12,9 +12,14 @@ import { MOODS, buildCatalog } from '../../scripts/build-catalog.ts'
 import type { CatalogEntry } from '../../scripts/build-catalog.ts'
 import { loadCatalog } from './catalog.ts'
 import {
-  GutenbergError,
+  LENGTH_FILTERS,
   MAX_ANALYSED_WORDS,
+  SourceError,
   capWords,
+  type LengthFilter,
+} from './common.ts'
+import {
+  estimateWords,
   findBook,
   gutenbergPage,
   loadBookText,
@@ -34,6 +39,14 @@ import {
   readAnalysis,
   readOpening,
 } from './guide.ts'
+import { SOURCES, searchSources, type SourceChoice } from './search.ts'
+import {
+  NotPublicDomain,
+  type WikisourceText,
+  describePages,
+  pickWikisource,
+  searchWikisource,
+} from './wikisource.ts'
 
 const ROOT = new URL('./', import.meta.url)
 try {
@@ -140,21 +153,106 @@ app.get('/api/stories', (_req, res) => {
   )
 })
 
-/** Project Gutenberg search, through Gutendex. The browser never calls Gutendex itself. */
-app.get('/api/gutenberg/search', async (req, res) => {
+/** Titles in the Dog-Eared Tales catalog that come from this Gutenberg book (empty: none). */
+const catalogTitlesFrom = (gutenbergId: number): string[] =>
+  entries
+    .filter((e) => e.id.startsWith(`pg-${gutenbergId}-`))
+    .map((e) => e.title)
+
+function sendSourceError(res: express.Response, error: unknown): void {
+  const message = error instanceof Error ? error.message : String(error)
+  console.error(`story-guide: ${message}`)
+  const status =
+    error instanceof NotPublicDomain
+      ? 403
+      : error instanceof SourceError
+        ? 502
+        : 500
+  res.status(status).json({
+    error:
+      error instanceof SourceError
+        ? message
+        : 'Something went wrong on the server. See the terminal.',
+  })
+}
+
+/** What the page and the analysis need to know about a book from outside the catalog. */
+interface Outside {
+  source: 'gutenberg' | 'wikisource'
+  /** The text to analyse: at most the first 20,000 words. */
+  story: string
+  title: string
+  author: string
+  url: string
+  totalWords: number
+  analysedWords: number
+  truncated: boolean
+  /** Wikisource: the work has more chapters than were fetched (fetching stops at 20,000 words). */
+  partial: boolean
+  limit: number
+  inCatalog: string[]
+  license?: { tag: string; from?: string }
+}
+
+async function outsideGutenberg(id: number): Promise<Outside> {
+  const book = await findBook(id)
+  const capped = capWords(
+    trimGutenbergText(await loadBookText(book)),
+    MAX_ANALYSED_WORDS,
+  )
+  return {
+    source: 'gutenberg',
+    story: capped.text,
+    title: book.title,
+    author: book.author,
+    url: gutenbergPage(id),
+    totalWords: capped.totalWords,
+    analysedWords: capped.analysedWords,
+    truncated: capped.truncated,
+    partial: false,
+    limit: MAX_ANALYSED_WORDS,
+    inCatalog: catalogTitlesFrom(id),
+  }
+}
+
+/** An Outside without its text: what is sent to the page. */
+const describeOutside = (outside: Outside): Omit<Outside, 'story'> =>
+  Object.fromEntries(
+    Object.entries(outside).filter(([key]) => key !== 'story'),
+  ) as Omit<Outside, 'story'>
+
+/** One search over Project Gutenberg, Wikisource or both, with a length filter. */
+app.get('/api/search', async (req, res) => {
   const q = typeof req.query.q === 'string' ? req.query.q.trim() : ''
+  const source = (SOURCES as readonly string[]).includes(
+    String(req.query.source),
+  )
+    ? (req.query.source as SourceChoice)
+    : 'both'
+  const length = (LENGTH_FILTERS as readonly string[]).includes(
+    String(req.query.length),
+  )
+    ? (req.query.length as LengthFilter)
+    : 'any'
   if (!q) {
     res.status(400).json({ error: 'Type something to search for.' })
     return
   }
   try {
-    res.json(await searchGutenberg(q))
+    res.json(
+      await searchSources(q, source, length, {
+        gutenbergSearch: (query, limit) => searchGutenberg(query, limit),
+        gutenbergWords: (ids) => estimateWords(ids),
+        wikisourceSearch: (query, limit) => searchWikisource(query, limit),
+        wikisourceDescribe: (titles) => describePages(titles),
+      }),
+    )
   } catch (error) {
-    sendGutenbergError(res, error)
+    sendSourceError(res, error)
   }
 })
 
-/** Picks a book: downloads its text (once, then cached), trims it and counts the words. */
+/** Picks a Gutenberg book: downloads its text (once, then cached), trims it and counts the words. */
 app.get('/api/gutenberg/book/:id', async (req, res) => {
   const id = Number(req.params.id)
   if (!Number.isInteger(id) || id <= 0) {
@@ -162,43 +260,51 @@ app.get('/api/gutenberg/book/:id', async (req, res) => {
     return
   }
   try {
-    const book = await findBook(id)
-    const text = trimGutenbergText(await loadBookText(book))
-    const { analysedWords, totalWords, truncated } = capWords(
-      text,
-      MAX_ANALYSED_WORDS,
-    )
-    res.json({
-      id,
-      title: book.title,
-      author: book.author,
-      url: gutenbergPage(id),
-      totalWords,
-      analysedWords,
-      truncated,
-      limit: MAX_ANALYSED_WORDS,
-      inCatalog: catalogTitlesFrom(id),
-    })
+    res.json(describeOutside(await outsideGutenberg(id)))
   } catch (error) {
-    sendGutenbergError(res, error)
+    sendSourceError(res, error)
   }
 })
 
-/** Titles in the Dog-Eared Tales catalog that come from this Gutenberg book (empty: none). */
-const catalogTitlesFrom = (gutenbergId: number): string[] =>
-  entries
-    .filter((e) => e.id.startsWith(`pg-${gutenbergId}-`))
-    .map((e) => e.title)
+/**
+ * Picks a Wikisource page. Public-domain pages only. An editions page (versions or
+ * disambiguation) answers with its editions as choices.
+ */
+app.get('/api/wikisource/book', async (req, res) => {
+  const title =
+    typeof req.query.title === 'string' ? req.query.title.trim() : ''
+  if (!title) {
+    res.status(400).json({ error: 'No Wikisource page was given.' })
+    return
+  }
+  try {
+    const picked = await pickWikisource(title)
+    if (picked.kind === 'editions') {
+      res.json(picked)
+      return
+    }
+    res.json({ kind: 'text', ...describeOutside(wikisourceOutside(picked)) })
+  } catch (error) {
+    sendSourceError(res, error)
+  }
+})
 
-function sendGutenbergError(res: express.Response, error: unknown): void {
-  const message = error instanceof Error ? error.message : String(error)
-  console.error(`story-guide: ${message}`)
-  res.status(error instanceof GutenbergError ? 502 : 500).json({
-    error:
-      error instanceof GutenbergError
-        ? message
-        : 'Something went wrong on the server. See the terminal.',
-  })
+function wikisourceOutside(picked: WikisourceText): Outside {
+  const capped = capWords(picked.text, MAX_ANALYSED_WORDS)
+  return {
+    source: 'wikisource',
+    story: capped.text,
+    title: picked.title,
+    author: picked.author,
+    url: picked.url,
+    totalWords: capped.totalWords,
+    analysedWords: capped.analysedWords,
+    truncated: capped.truncated,
+    partial: picked.partial,
+    limit: MAX_ANALYSED_WORDS,
+    inCatalog: [],
+    license: picked.license,
+  }
 }
 
 app.post('/analyze', async (req, res) => {
@@ -212,30 +318,20 @@ app.post('/analyze', async (req, res) => {
   const {
     id,
     gutenbergId,
+    wikisourceTitle,
     text: pasted,
     title,
   } = (req.body ?? {}) as {
     id?: unknown
     gutenbergId?: unknown
+    wikisourceTitle?: unknown
     text?: unknown
     title?: unknown
   }
 
   let story = ''
   let curated: CatalogEntry | undefined
-  let gutenberg:
-    | {
-        id: number
-        title: string
-        author: string
-        url: string
-        totalWords: number
-        analysedWords: number
-        truncated: boolean
-        limit: number
-        inCatalog: string[]
-      }
-    | undefined
+  let outside: Outside | undefined
   let label =
     typeof title === 'string' && title.trim() ? title.trim() : 'Pasted text'
   if (typeof id === 'string' && id) {
@@ -253,30 +349,33 @@ app.post('/analyze', async (req, res) => {
       return
     }
     try {
-      const book = await findBook(number)
-      const trimmed = trimGutenbergText(await loadBookText(book))
-      // The full-story call reads at most the first 20,000 words; the blurb call then uses
-      // the first third of what is read.
-      const capped = capWords(trimmed, MAX_ANALYSED_WORDS)
-      story = capped.text
-      label = `${book.title}, ${book.author}`
-      gutenberg = {
-        id: number,
-        title: book.title,
-        author: book.author,
-        url: gutenbergPage(number),
-        totalWords: capped.totalWords,
-        analysedWords: capped.analysedWords,
-        truncated: capped.truncated,
-        limit: MAX_ANALYSED_WORDS,
-        inCatalog: catalogTitlesFrom(number),
-      }
+      outside = await outsideGutenberg(number)
     } catch (error) {
-      sendGutenbergError(res, error)
+      sendSourceError(res, error)
+      return
+    }
+  } else if (typeof wikisourceTitle === 'string' && wikisourceTitle.trim()) {
+    try {
+      const picked = await pickWikisource(wikisourceTitle.trim())
+      if (picked.kind === 'editions') {
+        res.status(400).json({
+          error: `"${picked.title}" lists several editions. Pick one of them first.`,
+        })
+        return
+      }
+      outside = wikisourceOutside(picked)
+    } catch (error) {
+      sendSourceError(res, error)
       return
     }
   } else if (typeof pasted === 'string') {
     story = pasted.trim()
+  }
+  if (outside) {
+    // The full-story call reads at most the first 20,000 words; the blurb call then uses the
+    // first third of what is read.
+    story = outside.story
+    label = `${outside.title}, ${outside.author}`
   }
   const totalWords = story.match(/\S+/g)?.length ?? 0
   if (totalWords < MIN_PASTED_WORDS) {
@@ -312,8 +411,8 @@ app.post('/analyze', async (req, res) => {
           limit: AGE_REASON_MAX_WORDS,
         },
       },
-      source: gutenberg
-        ? { kind: 'gutenberg', ...gutenberg }
+      source: outside
+        ? { kind: outside.source, ...describeOutside(outside) }
         : { kind: curated ? 'catalog' : 'pasted' },
       curated: curated && {
         hook: curated.hook,
@@ -339,7 +438,7 @@ void loadCatalog()
   )
   .catch((error: Error) =>
     console.error(
-      `story-guide: Gutenberg catalog not ready (${error.message}); search will try Gutendex`,
+      `story-guide: Gutenberg catalog not ready (${error.message}); Gutenberg search will not work until it downloads`,
     ),
   )
 

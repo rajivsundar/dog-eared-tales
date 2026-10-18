@@ -1,5 +1,7 @@
-// Story Guide: Project Gutenberg search. All fetching happens here, on the server; the browser
-// never calls Gutendex or Gutenberg. A build-time tool: it never ships in the app.
+// Story Guide: Project Gutenberg. Search is local, over the official catalog file (see
+// catalog.ts); a book's text is its plain-text file on gutenberg.org. All fetching happens here,
+// on the server; the browser never contacts Gutenberg. A build-time tool: it never ships in the
+// app.
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { stripIllustrationPlaceholders } from '../../scripts/build-catalog.ts'
@@ -9,108 +11,26 @@ import {
   loadCatalog,
   searchIndex,
 } from './catalog.ts'
-import { GutenbergError, USER_AGENT, type Fetch } from './common.ts'
+import {
+  GutenbergError,
+  MAX_ANALYSED_WORDS,
+  MAX_RESULTS,
+  USER_AGENT,
+  capWords,
+  type Fetch,
+} from './common.ts'
 
-export { GutenbergError, USER_AGENT }
-
-// Gutendex is only a fallback now: the local catalog file is searched first.
-export const GUTENDEX = 'https://gutendex.com/books/'
-/** The most words the full-story call reads. */
-export const MAX_ANALYSED_WORDS = 20_000
-export const MAX_RESULTS = 10
+export { GutenbergError, MAX_ANALYSED_WORDS, USER_AGENT, capWords }
 
 export interface GutenbergResult {
   id: number
   title: string
   author: string
-  downloads: number
 }
 
 export interface GutenbergBook extends GutenbergResult {
-  /** The plain-text file Gutendex gave for this book. */
+  /** The plain-text file for this book. */
   textUrl: string
-}
-
-/** "Poe, Edgar Allan" becomes "Edgar Allan Poe". */
-export function readableAuthor(name: string): string {
-  const [last, first] = name.split(/,\s*/, 2)
-  return first ? `${first} ${last}` : name
-}
-
-interface RawBook {
-  id?: unknown
-  title?: unknown
-  authors?: { name?: unknown }[]
-  download_count?: unknown
-  formats?: Record<string, unknown>
-}
-
-/** The plain-text (UTF-8 if there is one) link in a Gutendex book's formats. */
-export function pickTextUrl(
-  formats: Record<string, unknown> | undefined,
-): string | null {
-  const plain = Object.entries(formats ?? {}).filter(
-    ([type, url]) =>
-      type.startsWith('text/plain') &&
-      typeof url === 'string' &&
-      !url.endsWith('.zip'),
-  ) as [string, string][]
-  const utf8 = plain.find(([type]) => /utf-?8/i.test(type))
-  return (utf8 ?? plain[0])?.[1] ?? null
-}
-
-export function toBook(raw: RawBook): GutenbergBook | null {
-  if (typeof raw.id !== 'number' || typeof raw.title !== 'string') return null
-  const name = raw.authors?.[0]?.name
-  return {
-    id: raw.id,
-    title: raw.title.replace(/\s+/g, ' ').trim(),
-    author: typeof name === 'string' ? readableAuthor(name) : 'Unknown author',
-    downloads: typeof raw.download_count === 'number' ? raw.download_count : 0,
-    textUrl: pickTextUrl(raw.formats) ?? '',
-  }
-}
-
-const DOWN =
-  'Project Gutenberg search (Gutendex) is not answering right now. Try again in a minute, or pick a catalog story or paste text instead.'
-
-async function getJson(url: string, fetchFn: Fetch): Promise<unknown> {
-  let response: Response
-  try {
-    response = await fetchFn(url, {
-      headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
-      signal: AbortSignal.timeout(15_000),
-    })
-  } catch {
-    throw new GutenbergError(DOWN)
-  }
-  if (response.status === 404) throw new GutenbergError('No such book.')
-  if (!response.ok) throw new GutenbergError(DOWN)
-  try {
-    return await response.json()
-  } catch {
-    throw new GutenbergError(DOWN)
-  }
-}
-
-/** The top 10 English, public-domain results for a search. */
-export async function searchGutendex(
-  query: string,
-  fetchFn: Fetch = fetch,
-): Promise<GutenbergResult[]> {
-  const url = `${GUTENDEX}?${new URLSearchParams({
-    search: query,
-    languages: 'en',
-    copyright: 'false',
-  })}`
-  const body = (await getJson(url, fetchFn)) as { results?: RawBook[] }
-  const books = (body.results ?? []).map(toBook).filter((b) => b !== null)
-  return books.slice(0, MAX_RESULTS).map((b) => ({
-    id: b.id,
-    title: b.title,
-    author: b.author,
-    downloads: b.downloads,
-  }))
 }
 
 const CACHE = new URL('./cache/', import.meta.url)
@@ -119,41 +39,39 @@ const CACHE = new URL('./cache/', import.meta.url)
 export const gutenbergTextUrl = (id: number): string =>
   `https://www.gutenberg.org/cache/epub/${id}/pg${id}.txt`
 
+export const gutenbergPage = (id: number): string =>
+  `https://www.gutenberg.org/ebooks/${id}`
+
+const NO_CATALOG =
+  "Could not get Project Gutenberg's catalog file, and there is no saved copy yet. Check your internet connection and try again in a minute, or use Wikisource or paste text instead."
+
 /**
- * Searches Project Gutenberg's official catalog file on this computer (title and author, English
- * only, forgiving of small misspellings). Only if that file cannot be downloaded and there is no
- * copy is Gutendex tried instead.
+ * Searches Project Gutenberg's official catalog file on this computer: English texts, title and
+ * author, forgiving small misspellings. Returns the best `limit` matches.
  */
 export async function searchGutenberg(
   query: string,
+  limit = MAX_RESULTS,
   fetchFn: Fetch = fetch,
   catalog: () => Promise<CatalogIndex> = () => loadCatalog(fetchFn),
 ): Promise<GutenbergResult[]> {
   try {
-    return searchIndex(await catalog(), query, MAX_RESULTS).map((hit) => ({
-      ...hit,
-      downloads: 0,
-    }))
+    return searchIndex(await catalog(), query, limit)
   } catch (error) {
-    if (!(error instanceof CatalogUnavailable)) throw error
-    console.error(
-      `story-guide: the Gutenberg catalog file is not available (${error.message}); trying Gutendex`,
-    )
-  }
-  try {
-    return await searchGutendex(query, fetchFn)
-  } catch {
-    throw new GutenbergError(
-      "Could not get Project Gutenberg's catalog file, and the Gutendex fallback is not answering either. Check your internet connection and try again in a minute, or pick a catalog story or paste text instead.",
-    )
+    if (error instanceof CatalogUnavailable) {
+      console.error(
+        `story-guide: the Gutenberg catalog is not available (${error.message})`,
+      )
+      throw new GutenbergError(NO_CATALOG)
+    }
+    throw error
   }
 }
 
 /**
- * One book by its Gutenberg id. The client only ever sends the id, never a link. The details come
- * from the local catalog file (the text link is Gutenberg's standard one); only for a book not in
- * it, or with no catalog file, is Gutendex asked. Kept in cache/<id>.json, so a book already
- * picked needs neither.
+ * One book by its Gutenberg id. The client only ever sends the id, never a link; the details come
+ * from the local catalog file and the text link is Gutenberg's standard one. Kept in
+ * cache/<id>.json, so a book already picked needs no catalog.
  */
 export async function findBook(
   id: number,
@@ -163,51 +81,99 @@ export async function findBook(
 ): Promise<GutenbergBook> {
   const file = new URL(`${id}.json`, cacheDir)
   try {
-    const cached = toBook(
-      JSON.parse(await readFile(file, 'utf8')) as RawBook & {
-        textUrl?: string
-      },
+    const cached = JSON.parse(
+      await readFile(file, 'utf8'),
+    ) as Partial<GutenbergBook>
+    if (
+      cached.id === id &&
+      typeof cached.title === 'string' &&
+      typeof cached.author === 'string' &&
+      typeof cached.textUrl === 'string'
     )
-    if (cached) return cached
+      return cached as GutenbergBook
   } catch {
     // Not cached yet.
   }
-
-  let book: GutenbergBook | null = null
+  let row
   try {
-    const row = (await catalog()).byId.get(id)
-    if (row)
-      book = {
-        id,
-        title: row.title,
-        author: row.author,
-        downloads: 0,
-        textUrl: gutenbergTextUrl(id),
-      }
+    row = (await catalog()).byId.get(id)
   } catch (error) {
-    if (!(error instanceof CatalogUnavailable)) throw error
+    if (error instanceof CatalogUnavailable)
+      throw new GutenbergError(NO_CATALOG)
+    throw error
   }
-  if (!book) {
-    const raw = (await getJson(`${GUTENDEX}${id}/`, fetchFn)) as RawBook
-    book = toBook(raw)
-    if (!book)
-      throw new GutenbergError('Gutendex sent back something unexpected.')
-    if (!book.textUrl)
-      throw new GutenbergError('This book has no plain-text file on Gutenberg.')
+  if (!row)
+    throw new GutenbergError(
+      `Project Gutenberg book ${id} is not in the English text catalog.`,
+    )
+  const book: GutenbergBook = {
+    id,
+    title: row.title,
+    author: row.author,
+    textUrl: gutenbergTextUrl(id),
   }
   await mkdir(cacheDir, { recursive: true })
-  await writeFile(
-    file,
-    JSON.stringify({
-      id: book.id,
-      title: book.title,
-      authors: [{ name: book.author }],
-      download_count: book.downloads,
-      formats: { 'text/plain; charset=utf-8': book.textUrl },
-    }),
-    'utf8',
-  )
+  await writeFile(file, JSON.stringify(book), 'utf8')
   return book
+}
+
+/**
+ * About how many words a Gutenberg book has, from the size of its plain-text file (a HEAD
+ * request: the book is not downloaded). The file holds about 18 KB of licence text besides the
+ * book, which is taken off before counting about 6 bytes a word (measured on four real books:
+ * within about 5 percent).
+ */
+export const LICENCE_BYTES = 18_000
+export const BYTES_PER_WORD = 6
+export const wordsFromBytes = (bytes: number): number =>
+  Math.max(0, Math.round((bytes - LICENCE_BYTES) / BYTES_PER_WORD))
+
+/**
+ * Estimated words for several books, from HEAD requests (a few at a time, never the book itself).
+ * Sizes are remembered in cache/gutenberg-sizes.json, so a repeat search asks nothing.
+ */
+export async function estimateWords(
+  ids: number[],
+  fetchFn: Fetch = fetch,
+  cacheDir: URL = CACHE,
+): Promise<Map<number, number | undefined>> {
+  const file = new URL('gutenberg-sizes.json', cacheDir)
+  let sizes: Record<string, number> = {}
+  try {
+    sizes = JSON.parse(await readFile(file, 'utf8')) as Record<string, number>
+  } catch {
+    // Nothing remembered yet.
+  }
+  const missing = ids.filter((id) => sizes[id] === undefined)
+  let next = 0
+  const worker = async () => {
+    while (next < missing.length) {
+      const id = missing[next++]
+      try {
+        const response = await fetchFn(gutenbergTextUrl(id), {
+          method: 'HEAD',
+          // Uncompressed: with compression the server reports the size of the zipped file.
+          headers: { 'User-Agent': USER_AGENT, 'Accept-Encoding': 'identity' },
+          signal: AbortSignal.timeout(10_000),
+        })
+        const bytes = Number(response.headers.get('content-length'))
+        if (response.ok && bytes > 0) sizes[id] = bytes
+      } catch {
+        // No estimate for this one.
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(4, missing.length) }, worker))
+  if (missing.length > 0) {
+    await mkdir(cacheDir, { recursive: true })
+    await writeFile(file, JSON.stringify(sizes), 'utf8')
+  }
+  return new Map(
+    ids.map((id) => [
+      id,
+      sizes[id] === undefined ? undefined : wordsFromBytes(sizes[id]),
+    ]),
+  )
 }
 
 /**
@@ -229,34 +195,9 @@ export function trimGutenbergText(raw: string): string {
   return stripIllustrationPlaceholders(text).trim()
 }
 
-/** At most `max` words of a text, cut after a whole word. */
-export function capWords(
-  text: string,
-  max: number,
-): {
-  text: string
-  analysedWords: number
-  totalWords: number
-  truncated: boolean
-} {
-  let count = 0
-  let end = text.length
-  for (const match of text.matchAll(/\S+/g)) {
-    count++
-    if (count === max) end = match.index + match[0].length
-  }
-  const truncated = count > max
-  return {
-    text: truncated ? text.slice(0, end) : text,
-    analysedWords: Math.min(count, max),
-    totalWords: count,
-    truncated,
-  }
-}
-
 /**
  * A book's raw text, downloaded once and kept in tools/story-guide/cache/<id>.txt. Only a link
- * on gutenberg.org that Gutendex gave is ever fetched.
+ * on gutenberg.org is ever fetched.
  */
 export async function loadBookText(
   book: GutenbergBook,
@@ -271,9 +212,7 @@ export async function loadBookText(
   }
   const host = new URL(book.textUrl).hostname
   if (host !== 'gutenberg.org' && !host.endsWith('.gutenberg.org'))
-    throw new GutenbergError(
-      'Gutendex sent a text link that is not on gutenberg.org.',
-    )
+    throw new GutenbergError('The text link is not on gutenberg.org.')
   let response: Response
   try {
     response = await fetchFn(book.textUrl, {
@@ -294,6 +233,3 @@ export async function loadBookText(
   await writeFile(file, text, 'utf8')
   return text
 }
-
-export const gutenbergPage = (id: number): string =>
-  `https://www.gutenberg.org/ebooks/${id}`

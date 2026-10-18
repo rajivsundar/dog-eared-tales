@@ -163,6 +163,12 @@
         margin: 0;
         padding: 0;
       }
+      .filters > div {
+        flex: 1;
+      }
+      .gresults li.greyed {
+        opacity: 0.55;
+      }
       .gresults li {
         display: flex;
         gap: 0.75rem;
@@ -213,16 +219,36 @@
         <select id="story"></select>
         <p class="muted" id="count"></p>
 
-        <label for="gsearch">Or search Project Gutenberg</label>
+        <label for="gsearch">Or search Project Gutenberg and Wikisource</label>
         <div class="row">
           <input
             id="gsearch"
             type="search"
-            placeholder="Title or author, e.g. The Open Window"
+            placeholder="Title or author, e.g. edgar allan poe"
           />
           <button id="gsearch-go" type="button" class="small">Search</button>
         </div>
+        <div class="row filters">
+          <div>
+            <label for="gsource">Source</label>
+            <select id="gsource">
+              <option value="gutenberg">Project Gutenberg</option>
+              <option value="wikisource">Wikisource</option>
+              <option value="both" selected>Both</option>
+            </select>
+          </div>
+          <div>
+            <label for="glength">Length</label>
+            <select id="glength">
+              <option value="any">Any</option>
+              <option value="short">Short (under 5,000 words)</option>
+              <option value="medium">Medium (5,000 to 20,000)</option>
+              <option value="long">Long (over 20,000)</option>
+            </select>
+          </div>
+        </div>
         <p id="gstatus" role="status" class="muted"></p>
+        <p id="gheading" class="muted" hidden></p>
         <ul id="gresults" class="gresults"></ul>
         <div id="gpicked" class="picked" hidden></div>
 
@@ -465,7 +491,7 @@
                   ),
                 ),
               )
-            : r.source && r.source.kind === 'gutenberg'
+            : isOutside(r.source)
               ? text(
                   r.source.inCatalog.length
                     ? inCatalogNote(r.source.inCatalog)
@@ -489,53 +515,52 @@
         )
         out.replaceChildren(
           el('h2', { textContent: r.label }),
-          ...(r.source && r.source.kind === 'gutenberg'
-            ? [
-                el(
-                  'p',
-                  {},
-                  el('span', {
-                    textContent:
-                      'Project Gutenberg: ' +
-                      r.source.title +
-                      ' by ' +
-                      r.source.author +
-                      '. ',
-                  }),
-                  gutenbergLink(r.source.id),
-                ),
-                r.source.truncated
-                  ? text(
-                      'Only the first ' +
-                        r.source.limit.toLocaleString() +
-                        ' of ' +
-                        r.source.totalWords.toLocaleString() +
-                        ' words were analysed; the blurb uses the first third of those.',
-                      'bad',
-                    )
-                  : el('span'),
-              ]
-            : []),
+          ...outsideHeader(r.source),
           el('div', { className: 'cols' }, gemmaCol, curatedCol),
           checks,
         )
       }
 
-      // Project Gutenberg: the page only talks to this server, never to Gutendex or Gutenberg.
-      let gutenbergPick = null
-      const gutenbergLink = (id) =>
-        el('a', {
-          href: 'https://www.gutenberg.org/ebooks/' + Number(id),
-          target: '_blank',
-          rel: 'noopener noreferrer',
-          textContent: 'View on Project Gutenberg',
-        })
+      // Books from outside the catalog: the page only talks to this server, never to Project
+      // Gutenberg or Wikisource.
+      let outsidePick = null
+      const SOURCE_NAMES = {
+        gutenberg: 'Project Gutenberg',
+        wikisource: 'Wikisource',
+      }
+      const SAFE_LINKS = [
+        'https://www.gutenberg.org/',
+        'https://en.wikisource.org/',
+      ]
+      const isOutside = (source) =>
+        Boolean(
+          source &&
+          (source.kind === 'gutenberg' || source.kind === 'wikisource'),
+        )
+
+      const sourceLink = (source) =>
+        SAFE_LINKS.some((prefix) => String(source.url).startsWith(prefix))
+          ? el('a', {
+              href: source.url,
+              target: '_blank',
+              rel: 'noopener noreferrer',
+              textContent:
+                'View on ' + SOURCE_NAMES[source.kind || source.source],
+            })
+          : el('span')
+
       const limitNote = (b) =>
-        'This book has ' +
-        b.totalWords.toLocaleString() +
-        ' words. Only the first ' +
-        b.limit.toLocaleString() +
-        ' words will be analysed; the blurb is written from the first third of those.'
+        b.partial
+          ? 'This work is longer than ' +
+            b.limit.toLocaleString() +
+            ' words (fetching stopped there). Only the first ' +
+            b.limit.toLocaleString() +
+            ' words will be analysed; the blurb is written from the first third of those.'
+          : 'This book has ' +
+            b.totalWords.toLocaleString() +
+            ' words. Only the first ' +
+            b.limit.toLocaleString() +
+            ' words will be analysed; the blurb is written from the first third of those.'
 
       const inCatalogNote = (titles) =>
         'This book is already in the Dog-Eared Tales catalog (' +
@@ -543,70 +568,153 @@
         (titles.length > 3 ? ', …' : '') +
         '). Pick it from the catalog list to compare with the curated version.'
 
+      const licenceText = (license) =>
+        license
+          ? 'Licence tag: ' +
+            license.tag +
+            ' (US public domain)' +
+            (license.from ? ', from “' + license.from + '”' : '')
+          : ''
+
+      // The source, the book and its page, at the top of the results.
+      function outsideHeader(source) {
+        if (!isOutside(source)) return []
+        return [
+          el(
+            'p',
+            {},
+            el('span', {
+              textContent:
+                SOURCE_NAMES[source.kind] +
+                ': ' +
+                source.title +
+                ' by ' +
+                source.author +
+                '. ',
+            }),
+            sourceLink(source),
+          ),
+          source.license
+            ? text(licenceText(source.license), 'muted')
+            : el('span'),
+          source.truncated
+            ? text(
+                'Only the first ' +
+                  source.limit.toLocaleString() +
+                  (source.partial
+                    ? ' words of this long work were fetched and analysed'
+                    : ' of ' +
+                      source.totalWords.toLocaleString() +
+                      ' words were analysed') +
+                  '; the blurb uses the first third of those.',
+                'bad',
+              )
+            : el('span'),
+        ]
+      }
+
       function clearPick() {
-        gutenbergPick = null
+        outsidePick = null
         $('gpicked').hidden = true
         $('gpicked').replaceChildren()
       }
 
-      async function searchGutenberg() {
+      const resultLine = (r) =>
+        r.title +
+        ' — ' +
+        r.author +
+        ' · ' +
+        SOURCE_NAMES[r.source] +
+        (r.length
+          ? ' · ' + r.length
+          : r.kind === 'editions'
+            ? ' · several editions'
+            : ' · length unknown') +
+        (r.license ? ' · ' + r.license : '')
+
+      function showResults(list) {
+        $('gresults').replaceChildren(
+          ...list.map((r) => {
+            const greyed =
+              r.source === 'wikisource' && r.kind !== 'editions' && !r.license
+            return el(
+              'li',
+              { className: greyed ? 'greyed' : '' },
+              el('span', {
+                textContent: resultLine(r) + (r.note ? ' — ' + r.note : ''),
+              }),
+              // A page not marked US public domain has no button: it is not analysed.
+              greyed
+                ? el('span')
+                : el('button', {
+                    type: 'button',
+                    textContent:
+                      r.kind === 'editions' ? 'Show editions' : 'Use',
+                    onclick: () => pick(r),
+                  }),
+            )
+          }),
+        )
+      }
+
+      async function searchOutside() {
         const q = $('gsearch').value.trim()
         const status = $('gstatus')
         status.className = 'muted'
         if (!q) return
+        $('gheading').hidden = true
         $('gresults').replaceChildren()
-        status.textContent = 'Searching Project Gutenberg…'
+        status.textContent = 'Searching…'
         try {
-          const response = await fetch(
-            '/api/gutenberg/search?q=' + encodeURIComponent(q),
-          )
+          const params = new URLSearchParams({
+            q,
+            source: $('gsource').value,
+            length: $('glength').value,
+          })
+          const response = await fetch('/api/search?' + params)
           const data = await response.json()
           if (!response.ok) throw new Error(data.error || 'Search failed.')
-          status.textContent = data.length
-            ? ''
-            : 'No matches on Project Gutenberg.'
-          $('gresults').replaceChildren(
-            ...data.map((b) =>
-              el(
-                'li',
-                {},
-                el('span', {
-                  textContent:
-                    b.title +
-                    ' — ' +
-                    b.author +
-                    ' · #' +
-                    b.id +
-                    (b.downloads
-                      ? ' · ' + b.downloads.toLocaleString() + ' downloads'
-                      : ''),
-                }),
-                el('button', {
-                  type: 'button',
-                  textContent: 'Use',
-                  onclick: () => pickBook(b),
-                }),
-              ),
-            ),
-          )
+          status.className = data.notes.length ? 'bad' : 'muted'
+          status.textContent =
+            data.notes.join(' ') ||
+            (data.results.length
+              ? ''
+              : 'No matches.' +
+                ($('glength').value !== 'any' ? ' Try Length: Any.' : ''))
+          showResults(data.results)
         } catch (error) {
           status.className = 'bad'
           status.textContent = error.message
         }
       }
 
-      async function pickBook(b) {
+      async function pick(r) {
         const status = $('gstatus')
         status.className = 'muted'
-        status.textContent = 'Downloading “' + b.title + '”…'
+        status.textContent =
+          'Fetching “' +
+          r.title +
+          '”… (a long Wikisource work takes a few seconds)'
         try {
-          const response = await fetch('/api/gutenberg/book/' + Number(b.id))
+          const url =
+            r.source === 'gutenberg'
+              ? '/api/gutenberg/book/' + Number(r.key)
+              : '/api/wikisource/book?title=' + encodeURIComponent(r.key)
+          const response = await fetch(url)
           const data = await response.json()
-          if (!response.ok) throw new Error(data.error || 'Download failed.')
+          if (!response.ok) throw new Error(data.error || 'Could not fetch it.')
           status.textContent = ''
-          gutenbergPick = data
+          if (data.kind === 'editions') {
+            $('gheading').textContent =
+              'Editions of “' + data.title + '”: choose one.'
+            $('gheading').hidden = false
+            showResults(data.choices)
+            return
+          }
+          outsidePick = { ...data, requestKey: r.key }
           $('story').value = ''
           $('pasted').value = ''
+          const approx = data.partial ? 'at least ' : ''
           const box = $('gpicked')
           box.replaceChildren(
             el('p', {
@@ -616,10 +724,16 @@
                 ' — ' +
                 data.author +
                 ' · ' +
+                SOURCE_NAMES[data.source] +
+                ' · ' +
+                approx +
                 data.totalWords.toLocaleString() +
                 ' words',
             }),
-            el('p', {}, gutenbergLink(data.id)),
+            el('p', {}, sourceLink({ ...data, kind: data.source })),
+            data.license
+              ? text(licenceText(data.license), 'muted')
+              : el('span'),
             data.inCatalog.length
               ? text(inCatalogNote(data.inCatalog), 'muted')
               : el('span'),
@@ -643,8 +757,10 @@
           'Asking Gemma (two calls, this can take a minute)…'
         $('results').replaceChildren()
         try {
-          const body = gutenbergPick
-            ? { gutenbergId: gutenbergPick.id }
+          const body = outsidePick
+            ? outsidePick.source === 'gutenberg'
+              ? { gutenbergId: outsidePick.id }
+              : { wikisourceTitle: outsidePick.requestKey }
             : id
               ? { id }
               : { text: pasted, title: $('pasted-title').value }
@@ -678,9 +794,9 @@
       })
       $('story').addEventListener('change', clearPick)
       $('pasted').addEventListener('input', clearPick)
-      $('gsearch-go').addEventListener('click', searchGutenberg)
+      $('gsearch-go').addEventListener('click', searchOutside)
       $('gsearch').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') searchGutenberg()
+        if (e.key === 'Enter') searchOutside()
       })
       $('go').addEventListener('click', analyze)
       ;(async () => {
