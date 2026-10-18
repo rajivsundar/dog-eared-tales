@@ -149,6 +149,10 @@
         padding: 0.15rem 0.5rem 0.15rem 0;
         border-bottom: 1px solid var(--line);
       }
+      td.reason {
+        font-size: 0.9rem;
+        padding: 0 0 0.35rem 1rem;
+      }
       .note {
         font-style: italic;
       }
@@ -235,8 +239,25 @@
         )
         const select = $('story')
         const previous = select.value
+        if (shown.length === 0) {
+          select.replaceChildren(
+            el('option', { value: '', textContent: 'No matches' }),
+          )
+          select.value = ''
+          $('count').textContent = 'No matches'
+          return
+        }
+        // While searching, the list holds only the matches and the first one is selected.
+        // With an empty search, the "(none)" choice comes back and a story picked earlier stays.
         select.replaceChildren(
-          el('option', { value: '', textContent: '(none: use pasted text)' }),
+          ...(q === ''
+            ? [
+                el('option', {
+                  value: '',
+                  textContent: '(none: use pasted text)',
+                }),
+              ]
+            : []),
           ...shown.map((s) =>
             el('option', {
               value: s.id,
@@ -245,7 +266,12 @@
             }),
           ),
         )
-        if (shown.some((s) => s.id === previous)) select.value = previous
+        select.value =
+          q !== ''
+            ? shown[0].id
+            : shown.some((s) => s.id === previous)
+              ? previous
+              : ''
         $('count').textContent =
           shown.length + ' of ' + stories.length + ' stories'
       }
@@ -274,17 +300,33 @@
       }
 
       function notesTable(gemma) {
-        const rows = Object.entries(gemma.contentNotes).map(([kind, level]) =>
-          el(
-            'tr',
-            {},
-            el('td', { textContent: kind }),
-            el('td', {
-              textContent: level ?? 'unclear',
-              className: level === 'strong' ? 'bad' : '',
-            }),
-          ),
-        )
+        const rows = []
+        for (const [kind, note] of Object.entries(gemma.contentNotes)) {
+          rows.push(
+            el(
+              'tr',
+              {},
+              el('td', { textContent: kind }),
+              el('td', {
+                textContent: note.level ?? 'unclear',
+                className: note.level === 'strong' ? 'bad' : '',
+              }),
+            ),
+          )
+          // A reason appears only under a mild or strong note.
+          if (note.reason)
+            rows.push(
+              el(
+                'tr',
+                {},
+                el('td', {
+                  colSpan: 2,
+                  className: 'reason muted',
+                  textContent: note.reason,
+                }),
+              ),
+            )
+        }
         return el('table', {}, ...rows)
       }
 
@@ -337,6 +379,16 @@
             'Age band',
             text(g.ageBand ?? 'unclear'),
             text(g.ageReason, 'muted'),
+            r.checks.ageReason.words > r.checks.ageReason.limit
+              ? text(
+                  'Age reason is ' +
+                    r.checks.ageReason.words +
+                    ' words, over the limit of ' +
+                    r.checks.ageReason.limit +
+                    '.',
+                  'bad',
+                )
+              : el('span'),
           ),
         )
         const c = r.curated
@@ -420,7 +472,7 @@
         }
       }
 
-      $('search').addEventListener('input', fillStories)
+      $('search').addEventListener('input', () => fillStories())
       $('go').addEventListener('click', analyze)
       ;(async () => {
         await loadStatus()

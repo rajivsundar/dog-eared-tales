@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { firstThird, parseModelJson } from './guide.ts'
+import {
+  RETRY_DELAYS_MS,
+  analysisPrompt,
+  fetchWithRetries,
+  firstThird,
+  parseModelJson,
+  readAnalysis,
+} from './guide.ts'
 
 const paragraph = (word: string, count: number): string =>
   Array.from({ length: count }, (_, i) => `${word}${i}`).join(' ')
@@ -54,5 +61,102 @@ describe('parseModelJson', () => {
     expect(parseModelJson('not json')).toBeNull()
     expect(parseModelJson('{"broken": ')).toBeNull()
     expect(parseModelJson('[1, 2]')).toBeNull()
+  })
+})
+
+const MOODS = ['funny', 'eerie', 'whimsical']
+
+describe('readAnalysis', () => {
+  const reply = {
+    moods: ['funny', 'Eerie', 'spooky'],
+    contentNotes: {
+      violence: { level: 'none', reason: 'should be dropped' },
+      death: { level: 'mild', reason: ' A death is mentioned, not shown. ' },
+      'frightening scenes': { level: 'strong', reason: '' },
+      'sexual themes': 'none',
+      'period racist language': { level: 'maybe', reason: 'x' },
+    },
+    ageBand: '10+',
+    ageReason: 'Mild death; nothing graphic.',
+  }
+
+  it('keeps a reason only for a mild or strong note', () => {
+    const a = readAnalysis(reply, MOODS)!
+    expect(a.contentNotes.violence).toEqual({ level: 'none', reason: '' })
+    expect(a.contentNotes.death).toEqual({
+      level: 'mild',
+      reason: 'A death is mentioned, not shown.',
+    })
+    expect(a.contentNotes['frightening scenes']).toEqual({
+      level: 'strong',
+      reason: '',
+    })
+  })
+
+  it('accepts a bare level, and marks a missing or unknown level as unclear', () => {
+    const a = readAnalysis(reply, MOODS)!
+    expect(a.contentNotes['sexual themes']).toEqual({
+      level: 'none',
+      reason: '',
+    })
+    expect(a.contentNotes['period racist language'].level).toBeNull()
+    expect(a.contentNotes['animal harm'].level).toBeNull()
+  })
+
+  it('keeps only catalog moods and says which it dropped', () => {
+    const a = readAnalysis(reply, MOODS)!
+    expect(a.moods).toEqual(['funny', 'eerie'])
+    expect(a.droppedMoods).toEqual(['spooky'])
+    expect(a.ageBand).toBe('10+')
+  })
+})
+
+describe('the full-story prompt', () => {
+  it('asks for a parent-ready age reason and spoiler-free note reasons', () => {
+    const prompt = analysisPrompt('A story.', MOODS)
+    expect(prompt).toContain('25 words or fewer')
+    expect(prompt).toContain('what is NOT in the story')
+    expect(prompt).toContain('12 words or fewer')
+    expect(prompt).toContain('empty string')
+  })
+})
+
+describe('fetchWithRetries', () => {
+  const answer = (status: number) => new Response('{}', { status })
+  const run = async (statuses: number[]) => {
+    const waits: number[] = []
+    const seen: number[] = []
+    let calls = 0
+    const response = await fetchWithRetries(
+      async () => answer(statuses[Math.min(calls++, statuses.length - 1)]),
+      {
+        sleep: async (ms) => void waits.push(ms),
+        onRetry: (status) => seen.push(status),
+      },
+    )
+    return { response, waits, seen, calls }
+  }
+
+  it('retries 500 and 503 after 1s, 3s and 6s, then gives up', async () => {
+    const { response, waits, seen, calls } = await run([503])
+    expect(response.status).toBe(503)
+    expect(calls).toBe(4)
+    expect(waits).toEqual([...RETRY_DELAYS_MS])
+    expect(waits).toEqual([1000, 3000, 6000])
+    expect(seen).toEqual([503, 503, 503])
+  })
+
+  it('stops as soon as a try succeeds', async () => {
+    const { response, waits, calls } = await run([500, 503, 200])
+    expect(response.status).toBe(200)
+    expect(calls).toBe(3)
+    expect(waits).toEqual([1000, 3000])
+  })
+
+  it('does not retry other errors', async () => {
+    const { response, waits, calls } = await run([400])
+    expect(response.status).toBe(400)
+    expect(calls).toBe(1)
+    expect(waits).toEqual([])
   })
 })

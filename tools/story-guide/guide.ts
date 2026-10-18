@@ -6,6 +6,8 @@ import { bannedWordsIn, copiedRun } from '../../scripts/curationChecks.ts'
 
 export const HOOK_MAX_WORDS = 20
 export const BLURB_MAX_WORDS = 60
+export const AGE_REASON_MAX_WORDS = 25
+export const NOTE_REASON_MAX_WORDS = 12
 
 export const NOTE_KINDS = [
   'violence',
@@ -93,12 +95,14 @@ export function analysisPrompt(
 
 Read the WHOLE story below, then reply with these labels:
 - "moods": up to 3 moods that best fit the story, chosen ONLY from this list: ${moods.join(', ')}. Use the exact words. Choose fewer than 3 if fewer fit.
-- "contentNotes": an object with exactly these six keys: ${NOTE_KINDS.map((k) => `"${k}"`).join(', ')}. Each value is exactly one of "none", "mild" or "strong", judged by what is actually in the story. "period racist language" means racist words or attitudes common in the era it was written.
+- "contentNotes": an object with exactly these six keys: ${NOTE_KINDS.map((k) => `"${k}"`).join(', ')}. Each value is an object with "level", exactly one of "none", "mild" or "strong", judged by what is actually in the story, and "reason". "period racist language" means racist words or attitudes common in the era it was written.
+  - For a note rated "mild" or "strong", "reason" is a short spoiler-free reason of ${NOTE_REASON_MAX_WORDS} words or fewer. Say what kind of thing it is, never who, how or how the story ends.
+  - For a note rated "none", "reason" is an empty string.
 - "ageBand": exactly one of ${AGE_BANDS.map((a) => `"${a}"`).join(', ')}, the youngest age the story suits.
-- "ageReason": ONE sentence for parents explaining the age band.
+- "ageReason": ONE sentence of ${AGE_REASON_MAX_WORDS} words or fewer, written for a parent. Name the content notes that drive the age band, and say what is NOT in the story. No plot details and no spoilers. Example: "Mild violence and a threat of death; nothing graphic, sexual or frightening for most 10-year-olds."
 
 Reply with JSON only, no code fences and no other text, in exactly this shape:
-{"moods": ["..."], "contentNotes": {"violence": "none", "death": "none", "frightening scenes": "none", "sexual themes": "none", "period racist language": "none", "animal harm": "none"}, "ageBand": "...", "ageReason": "..."}
+{"moods": ["..."], "contentNotes": {"violence": {"level": "none", "reason": ""}, "death": {"level": "mild", "reason": "..."}, "frightening scenes": {"level": "none", "reason": ""}, "sexual themes": {"level": "none", "reason": ""}, "period racist language": {"level": "none", "reason": ""}, "animal harm": {"level": "none", "reason": ""}}, "ageBand": "...", "ageReason": "..."}
 
 THE STORY:
 """
@@ -144,8 +148,11 @@ export interface Analysis {
   moods: string[]
   /** Moods Gemma named that are not in the catalog's list (dropped). */
   droppedMoods: string[]
-  /** Intensity per kind; null when Gemma's answer was missing or not none/mild/strong. */
-  contentNotes: Record<NoteKind, Intensity | null>
+  /**
+   * Level per kind (null when Gemma's answer was missing or not none/mild/strong), with a short
+   * reason for a mild or strong note. A note rated none has no reason.
+   */
+  contentNotes: Record<NoteKind, { level: Intensity | null; reason: string }>
   ageBand: AgeBand | null
   ageReason: string
 }
@@ -166,13 +173,26 @@ export function readAnalysis(
   const droppedMoods = named.filter((m) => !allowedMoods.includes(m))
 
   const raw = json.contentNotes as Record<string, unknown>
-  const contentNotes = {} as Record<NoteKind, Intensity | null>
+  const contentNotes = {} as Analysis['contentNotes']
   for (const kind of NOTE_KINDS) {
+    // A note is {level, reason}; a bare "mild" is accepted too.
+    const note = raw[kind]
+    const given: { level?: unknown; reason?: unknown } =
+      note !== null && typeof note === 'object'
+        ? (note as { level?: unknown; reason?: unknown })
+        : { level: note }
     const value =
-      typeof raw[kind] === 'string' ? raw[kind].trim().toLowerCase() : ''
-    contentNotes[kind] = (INTENSITIES as readonly string[]).includes(value)
+      typeof given.level === 'string' ? given.level.trim().toLowerCase() : ''
+    const level = (INTENSITIES as readonly string[]).includes(value)
       ? (value as Intensity)
       : null
+    contentNotes[kind] = {
+      level,
+      reason:
+        (level === 'mild' || level === 'strong') && isString(given.reason)
+          ? given.reason.trim()
+          : '',
+    }
   }
 
   const band = typeof json.ageBand === 'string' ? json.ageBand.trim() : ''
@@ -216,6 +236,35 @@ export function checkDescription(
     banned,
     copied,
     ok: !overLimit && banned.length === 0 && !copied,
+  }
+}
+
+/** The Gemini API statuses worth trying again, and how long to wait before each new try. */
+export const RETRY_STATUSES: readonly number[] = [500, 503]
+export const RETRY_DELAYS_MS: readonly number[] = [1000, 3000, 6000]
+
+/**
+ * Sends a request and, when the API answers 500 or 503, sends it again up to three times, after
+ * 1, 3 and 6 seconds. Returns the last response. `onRetry` is told only the status, never the
+ * request, so nothing secret can reach the log.
+ */
+export async function fetchWithRetries(
+  send: () => Promise<Response>,
+  options: {
+    delays?: readonly number[]
+    sleep?: (ms: number) => Promise<void>
+    onRetry?: (status: number, attempt: number, waitMs: number) => void
+  } = {},
+): Promise<Response> {
+  const delays = options.delays ?? RETRY_DELAYS_MS
+  const sleep =
+    options.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)))
+  for (let attempt = 0; ; attempt++) {
+    const response = await send()
+    if (!RETRY_STATUSES.includes(response.status) || attempt >= delays.length)
+      return response
+    options.onRetry?.(response.status, attempt + 1, delays[attempt])
+    await sleep(delays[attempt])
   }
 }
 

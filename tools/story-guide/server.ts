@@ -11,11 +11,13 @@ import express from 'express'
 import { MOODS, buildCatalog } from '../../scripts/build-catalog.ts'
 import type { CatalogEntry } from '../../scripts/build-catalog.ts'
 import {
+  AGE_REASON_MAX_WORDS,
   BLURB_MAX_WORDS,
   HOOK_MAX_WORDS,
   analysisPrompt,
   askForJson,
   checkDescription,
+  fetchWithRetries,
   firstThird,
   openingPrompt,
   readAnalysis,
@@ -52,16 +54,29 @@ try {
 /** One call to the Gemini API. All instructions are in the user message (Gemma takes no system prompt). */
 async function askGemma(prompt: string): Promise<string> {
   const key = apiKey()
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(MODEL)}:generateContent`,
+  const response = await fetchWithRetries(
+    () =>
+      fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(MODEL)}:generateContent`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': key,
+          },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.4, maxOutputTokens: 4096 },
+          }),
+          signal: AbortSignal.timeout(180_000),
+        },
+      ),
     {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.4, maxOutputTokens: 2048 },
-      }),
-      signal: AbortSignal.timeout(180_000),
+      // Terminal only, and only the status: never the key or the request.
+      onRetry: (status, attempt, waitMs) =>
+        console.error(
+          `story-guide: Gemini API answered ${status}; retry ${attempt} of 3 in ${waitMs / 1000}s`,
+        ),
     },
   )
   const body = (await response.json().catch(() => ({}))) as {
@@ -71,6 +86,9 @@ async function askGemma(prompt: string): Promise<string> {
     }[]
   }
   if (!response.ok) {
+    console.error(
+      `story-guide: Gemini API call failed with status ${response.status}`,
+    )
     const message = body.error?.message ?? `HTTP ${response.status}`
     throw new Error(`Gemini API: ${message.split(key).join('[key]')}`)
   }
@@ -173,6 +191,10 @@ app.post('/analyze', async (req, res) => {
       checks: {
         hook: checkDescription(described.value.hook, HOOK_MAX_WORDS, story),
         blurb: checkDescription(described.value.blurb, BLURB_MAX_WORDS, story),
+        ageReason: {
+          words: analysed.value.ageReason.match(/\S+/g)?.length ?? 0,
+          limit: AGE_REASON_MAX_WORDS,
+        },
       },
       curated: curated && {
         hook: curated.hook,
